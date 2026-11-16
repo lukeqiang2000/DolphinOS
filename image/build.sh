@@ -15,6 +15,9 @@ lb clean
 #   注意必须写成一个逗号分隔的单参数：lb config 的 --bootloaders 只取一个值，
 #   写成两个词时第二个词会被静默丢弃，LB_BOOTLOADER_EFI 变空、EFI 引导镜像不生成，
 #   最后 xorriso 写 hybrid ISO 时报 El Torito EFI 错误（首轮构建实测踩坑）。
+# - --bootappend-live "live-config.noautologin"：关掉 live-config 的 getty 自动登录，
+#   否则 tty1 会被自动登录的文字控制台抢占，greetd 接管不了 vt1、进不了图形登录
+#   （第二轮构建 ISO 真机试跑实测踩坑，配合 0090 hook 里 mask getty@tty1 双保险）。
 # - 目标 Debian 版 live-build 的参数名；Ubuntu 老版 live-build（3.0~a57）参数略有差异
 #   （--bootloader 单数等），在 Ubuntu 上构建时按 lb config --help 对照调整。
 lb config \
@@ -24,6 +27,7 @@ lb config \
     --archive-areas "main contrib non-free non-free-firmware" \
     --binary-images iso-hybrid \
     --bootloaders "grub-pc,grub-efi" \
+    --bootappend-live "live-config.noautologin" \
     --security false \
     --updates false \
     --mirror-bootstrap "http://deb.debian.org/debian/" \

@@ -1,0 +1,14 @@
+[package]
+name = "dolphin-shell"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 桌面 Shell（Slint）：窄顶栏 + 板块网格桌面"
+license = "MIT"
+
+[dependencies]
+slint = "1"
+dolphin-shape = { path = "../dolphin-shape" }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[build-dependencies]
+slint-build = "1"

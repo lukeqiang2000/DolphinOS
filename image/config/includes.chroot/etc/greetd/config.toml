@@ -1,0 +1,8 @@
+# greetd 配置（第一阶段占位：自研登录屏就绪后替换 agreety）
+# 默认会话 = labwc（DolphinOS 的 Wayland 会话）；登录后由 labwc 拉起自研 Shell。
+[terminal]
+vt = 1
+
+[default_session]
+command = "agreety --cmd labwc"
+user = "greeter"

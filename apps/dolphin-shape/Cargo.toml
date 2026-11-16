@@ -1,0 +1,6 @@
+[package]
+name = "dolphin-shape"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS squircle 超椭圆形状共享库（Shell 与各应用共用同一套点列算法）"
+license = "MIT"

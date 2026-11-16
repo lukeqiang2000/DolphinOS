@@ -1,0 +1,78 @@
+name: Build DolphinOS ISO (amd64)
+
+# 触发：手动触发，或 push 到 main 且改动 image/、apps/ 或本工作流时。
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "image/**"
+      - "apps/**"
+      - ".github/workflows/build-iso.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-iso:
+    name: Build amd64 sid ISO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 宿主机侧构建依赖：live-build / debootstrap 等（ISO 实际构建在
+      # 下面的 debian:sid 特权容器里完成，原因见「Build ISO」一步注释；
+      # 宿主机这份用于保持工具链齐备与后续排查）。
+      # 其余为 Slint 构建所需的系统库（fontconfig / xkbcommon 等）。
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            live-build debootstrap debian-archive-keyring \
+            squashfs-tools xorriso mtools dosfstools \
+            isolinux syslinux-common \
+            grub-pc-bin grub-efi-amd64-bin \
+            pkg-config libfontconfig1-dev libxkbcommon-dev libssl-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo test (dolphin-shape)
+        working-directory: apps
+        run: cargo test -p dolphin-shape
+
+      - name: Cargo build (dolphin-shell)
+        working-directory: apps
+        run: cargo build -p dolphin-shell
+
+      # ISO 构建适配说明（最小适配，不改已定规格）：
+      # image/build.sh 的参数（--bootloaders 复数等）针对 Debian 版
+      # live-build；ubuntu-24.04 自带的 live-build 是 3.0~a57 老分支，
+      # 参数名不同（--bootloader 单数等），直接在宿主机 sudo 跑必然失败。
+      # 因此按 STAGE1-REPORT 的建议，在 debian:sid 特权容器里原样跑
+      # image/build.sh：sid、amd64、labwc 默认会话等规格一字不改。
+      - name: Build ISO (debian:sid container, privileged)
+        run: |
+          chmod +x image/build.sh
+          docker run --rm --privileged \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work/image \
+            debian:sid \
+            sh -c "apt-get update \
+              && apt-get install -y --no-install-recommends live-build debootstrap debian-archive-keyring ca-certificates squashfs-tools xorriso mtools dosfstools isolinux syslinux-common grub-pc-bin grub-efi-amd64-bin \
+              && ./build.sh"
+
+      - name: List ISO output
+        run: ls -lh image/*.iso
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dolphinos-amd64-iso
+          path: image/*.iso
+          retention-days: 7
+          if-no-files-found: error

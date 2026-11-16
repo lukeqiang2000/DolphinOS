@@ -1,0 +1,15 @@
+#!/bin/sh
+# DolphinOS 会话收尾 hook（chroot 阶段执行）：
+# 1. 确保 greetd 默认会话指向 labwc（与 includes.chroot 的 config.toml 双保险）。
+# 2. 启用 greetd 与 seatd 服务，保证开机进登录链、非 root 会话能拿到 seat。
+set -e
+
+if [ -f /etc/greetd/config.toml ]; then
+    grep -q 'agreety --cmd labwc' /etc/greetd/config.toml || \
+        printf '\n[default_session]\ncommand = "agreety --cmd labwc"\nuser = "greeter"\n' >> /etc/greetd/config.toml
+fi
+
+systemctl enable greetd.service 2>/dev/null || true
+systemctl enable seatd.service 2>/dev/null || true
+# seatd 组成员：默认 live 用户需要 seat 权限时由 live-config 处理，这里仅保证组存在
+getent group seatd >/dev/null || groupadd -r seatd || true

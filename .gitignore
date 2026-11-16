@@ -1,0 +1,17 @@
+# Rust 构建产物（本地 apps/target 约 3.1 GB，绝不进仓库）
+apps/target/
+target/
+
+# ISO 与 live-build 中间产物（在 image/ 下构建时生成）
+*.iso
+*.img
+image/.build/
+image/binary/
+image/cache/
+image/chroot/
+image/*.log
+image/live-image-*
+
+# 编辑器与系统杂项
+.DS_Store
+*.swp

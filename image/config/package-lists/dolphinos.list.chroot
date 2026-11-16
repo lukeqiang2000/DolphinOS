@@ -1,0 +1,23 @@
+# DolphinOS 第一阶段包列表（chroot 阶段安装）
+# Live 基础
+live-boot
+live-config
+systemd-sysv
+
+# Wayland 会话与登录链（greeter 就绪前用 greetd + agreety 占位）
+labwc
+seatd
+greetd
+
+# 占位应用（自研版就绪后逐个换包）
+foot
+thunar
+
+# 网络与多媒体栈
+network-manager
+pipewire
+wireplumber
+xdg-desktop-portal-wlr
+
+# 字体（中文显示）
+fonts-noto-cjk

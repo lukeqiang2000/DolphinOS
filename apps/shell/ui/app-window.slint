@@ -1,0 +1,84 @@
+// DolphinOS Shell 骨架界面：窄顶栏 + 板块网格桌面（占位卡片）。
+// 正式版顶栏将通过 layer-shell 贴附在 labwc 会话顶部，这里先以普通窗口验证结构。
+
+component Card inherits Rectangle {
+    in property <string> label;
+    height: 120px;
+    border-radius: 18px;
+    background: #1a2129;
+    border-width: 1px;
+    border-color: #2b3644;
+
+    Text {
+        text: root.label;
+        color: #dbe4ee;
+        font-size: 15px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component AppWindow inherits Window {
+    in-out property <string> clock: "--:--";
+    title: "DolphinOS Shell";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    background: #0b0e11;
+
+    VerticalLayout {
+        // 窄顶栏：只放时间和状态图标（规格定案）
+        Rectangle {
+            height: 28px;
+            background: #10151b;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 10px;
+
+                Text {
+                    text: "DolphinOS";
+                    color: #8fa3b8;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {}
+
+                Text {
+                    text: "状态占位";
+                    color: #5b6b7c;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.clock;
+                    color: #e8eef4;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 板块网格桌面：常用应用成卡、其余按板块收纳（当前为占位卡片）
+        GridLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            Row {
+                Card { label: "文件"; }
+                Card { label: "终端"; }
+                Card { label: "浏览器"; }
+                Card { label: "设置"; }
+            }
+
+            Row {
+                Card { label: "照片"; }
+                Card { label: "播放器"; }
+                Card { label: "应用商店"; }
+                Card { label: "系统"; }
+            }
+        }
+    }
+}

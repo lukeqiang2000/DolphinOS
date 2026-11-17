@@ -1,12 +1,22 @@
-# greetd 配置（Alpha 7：自研图形登录屏 dolphin-greeter 替换 agreety 占位）
+# greetd 配置（Alpha 7：自研图形登录屏 dolphin-greeter 替换 agreety 占位；
+# Alpha 8：greeter 改由 cage 托管，见下）
 # dolphin-greeter 经 greetd IPC 与 greetd 通信、由 PAM 在服务端校验密码；
 # 登录成功后 greeter 请求启动的会话命令是 /usr/local/bin/dolphin-session
 # （包装脚本：拉起 labwc，渲染失败时自动改用 pixman 软件渲染重试）。
+#
+# 为什么套一层 cage（Alpha 8 修复）：Alpha 7 在 VirtualBox 实测时
+# dolphin-greeter 一启动就退出，报 winit「neither WAYLAND_DISPLAY nor
+# WAYLAND_SOCKET nor DISPLAY is set」——Slint/winit 必须先有 Wayland
+# 合成器提供显示环境才能初始化，而 greetd 裸拉起 greeter 时没有合成器。
+# cage 是只跑单个全屏应用的最小 kiosk 合成器，greetd 官方示例与
+# gtkgreet/regreet 等图形 greeter 都用它托管（cage 已进包列表）。
+# -s：允许 Ctrl+Alt+Fn 切换虚拟终端，登录屏出问题时能切到 tty 排查；
+# --：分隔符，其后是 greeter 本体绝对路径。
 [terminal]
 vt = 1
 
 [default_session]
-command = "/usr/bin/dolphin-greeter"
+command = "/usr/bin/cage -s -- /usr/bin/dolphin-greeter"
 user = "_greetd"
 
 # Live 自动登录（用户 2026-11-17 定案，Alpha 8 起）：Live 模式开机不经

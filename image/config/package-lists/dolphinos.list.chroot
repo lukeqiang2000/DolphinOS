@@ -9,10 +9,13 @@ systemd-sysv
 plymouth
 
 # Wayland 会话与登录链（Alpha 7：greetd + 自研 dolphin-greeter；
+# Alpha 8：greeter 改由 cage 托管，见 greetd config.toml 的说明；
 # agreety 是 greetd 包自带、无独立包，保留无妨但不再是默认会话）
+# cage：最小 kiosk 合成器，只负责给登录屏提供 Wayland 显示环境
 labwc
 seatd
 greetd
+cage
 
 # 桌面兜底与终端兜底
 # swaybg：登录后蓝底兜底（Shell 没起来时证明合成器活着）
@@ -36,6 +39,10 @@ network-manager
 pipewire
 wireplumber
 xdg-desktop-portal-wlr
+
+# 图标/光标主题（显式声明：Alpha 7 时它靠传递依赖带入，
+# 哪天上游依赖关系变了可能悄悄消失，故在此写死）
+adwaita-icon-theme
 
 # 字体（中文显示）
 fonts-noto-cjk

@@ -1,5 +1,5 @@
 #!/bin/sh
-# DolphinOS Alpha 7 CI 容器内构建脚本（在 debian:sid 特权容器里运行，
+# DolphinOS Alpha 8 CI 容器内构建脚本（在 debian:sid 特权容器里运行，
 # 工作区挂载在 /work）。做三件事：
 #   1. 装齐 live-build 与 Rust/Slint/feature 构建依赖；
 #   2. cargo build --release 编译全部自研应用，strip 后注入

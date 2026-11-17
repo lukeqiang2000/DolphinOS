@@ -1,0 +1,38 @@
+#!/bin/sh
+# DolphinOS Shell 启动器（labwc autostart 调用）
+#
+# Alpha 8 实测：dolphin-shell 在 VirtualBox 里一次都没出现，桌面只剩蓝底。
+# Shell 进程若启动失败（窗口未映射就退出），必须留痕、不要静默消失，否则
+# 下次试跑仍无从定位。故本启动器：每次尝试记开始时间、退出码与运行时长到
+# /tmp/dolphin-shell.log（Shell 自己的 stdout/stderr 也追加到同一文件），
+# 快速失败（运行不足 10 秒）时隔 2 秒重试，最多 3 次；3 次都失败则放弃，
+# 桌面保持蓝底兜底、日志里有完整失败记录。
+export LANG=C.UTF-8
+
+LOG_FILE=/tmp/dolphin-shell.log
+
+log_msg() {
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+attempt=1
+while [ "$attempt" -le 3 ]; do
+    start_ts=$(date +%s)
+    log_msg "shell-launcher: attempt $attempt: dolphin-shell"
+    /usr/bin/dolphin-shell >> "$LOG_FILE" 2>&1
+    rc=$?
+    end_ts=$(date +%s)
+    elapsed=$((end_ts - start_ts))
+    log_msg "shell-launcher: attempt $attempt exited: rc=$rc elapsed=${elapsed}s"
+    if [ "$elapsed" -ge 10 ]; then
+        # 已稳定运行过一段时间才退出：视为会话正常结束，不再重拉。
+        exit "$rc"
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -le 3 ]; then
+        log_msg "shell-launcher: fast failure, retrying in 2s"
+        sleep 2
+    fi
+done
+log_msg "shell-launcher: giving up after 3 attempts (see $LOG_FILE)"
+exit 1

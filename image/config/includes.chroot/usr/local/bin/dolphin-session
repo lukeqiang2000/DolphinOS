@@ -27,6 +27,12 @@ LOG_FILE=/tmp/dolphin-session.log
 # WLR_RENDERER=pixman 前缀，不影响已 export 的变量）。
 export WLR_NO_HARDWARE_CURSORS=1
 
+# 强制 UTF-8 locale：镜像里虽有 /etc/default/locale（LANG=C.UTF-8），但
+# greetd 的 PAM 栈（common-session）不含 pam_env，那份文件从不生效，会话
+# 实际跑在 locale 'C' 下，foot 会报 "'C' is not a UTF-8 locale"（Alpha 8
+# VirtualBox 实测）。这里直接导出，覆盖整个图形会话。
+export LANG=C.UTF-8
+
 log_msg() {
     # 日志写不进去（例如 /tmp 不可写）也不能挡住会话启动
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null || true

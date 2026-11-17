@@ -16,6 +16,9 @@ labwc
 seatd
 greetd
 cage
+# xwayland：cage 启动时会创建 XWayland 服务，镜像里缺 /usr/bin/Xwayland 时
+# cage 报 "Cannot create XWayland server"（Alpha 8 登出后日志实证）；且 X11
+# 客户端（旧版 Linux 应用）也需要它。
 
 # 桌面兜底与终端兜底
 # swaybg：登录后蓝底兜底（Shell 没起来时证明合成器活着）

@@ -2,7 +2,7 @@
 # 1) 蓝底兜底：即使 Shell 起不来，桌面也是 Dolphin 蓝而不是黑屏，
 #    一眼能区分「合成器活着、Shell 没起来」和「合成器死了」。
 swaybg -c '#0b5bcb' >/dev/null 2>&1 &
-# 2) 自研桌面 Shell（窄顶栏 + 板块网格）；输出落盘便于排查。
-dolphin-shell >>/tmp/labwc.log 2>&1 &
+# 2) 自研桌面 Shell（窄顶栏 + 板块网格）；经启动器拉起，启动失败记日志并重试。
+/usr/local/bin/dolphin-shell-launcher &
 # 3) 心跳：autostart 跑完写就绪标记，tty 里可查。
 date '+%Y-%m-%d %H:%M:%S autostart done' > /tmp/dolphin-desktop-ready

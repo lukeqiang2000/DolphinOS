@@ -1,0 +1,43 @@
+#!/bin/sh
+# DolphinOS 登录屏会话包装（greetd default_session 的实际会话命令）
+#
+# cage 给 dolphin-greeter 提供 Wayland 显示环境。Alpha 8 实测：桌面点 Exit
+# 登出后，cage 在 VirtualBox（vmwgfx）里起不来，日志末尾是
+# "Cannot create XWayland server" 与 "handle for plane 0: Invalid argument"，
+# 登录屏没出现、只剩一屏日志。
+# 本包装做两件事：
+#   1. cage 首启失败时，改用 legacy modesetting（WLR_DRM_NO_ATOMIC=1）重试一次
+#      —— vmwgfx 的 DRM atomic 提交偶发 "Invalid argument" 是已知一类问题，
+#      关 atomic 可绕过；labwc 桌面本身用 atomic 正常，故只给登录屏这条路兜底。
+#   2. 两次都失败时睡 5 秒再退出，避免 greetd 立即重拉造成日志刷屏。
+# 另：common-session 不含 pam_env，/etc/default/locale 不生效，这里直接导出
+# UTF-8 locale（与 dolphin-session 同理）。
+export LANG=C.UTF-8
+
+LOG_FILE=/tmp/dolphin-greeter-session.log
+
+log_msg() {
+    # 日志写不进去也不能挡住登录屏启动
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+log_msg "greeter-session: first attempt: cage -s -- /usr/bin/dolphin-greeter"
+/usr/bin/cage -s -- /usr/bin/dolphin-greeter >> /tmp/dolphin-greeter.log 2>&1
+rc=$?
+log_msg "greeter-session: first attempt exited: rc=$rc"
+
+if [ "$rc" -eq 0 ]; then
+    # 正常退出（用户已登录、greetd 接管会话）：不重试，直接透传退出码。
+    exit 0
+fi
+
+log_msg "greeter-session: retrying with WLR_DRM_NO_ATOMIC=1"
+WLR_DRM_NO_ATOMIC=1 /usr/bin/cage -s -- /usr/bin/dolphin-greeter >> /tmp/dolphin-greeter.log 2>&1
+rc=$?
+log_msg "greeter-session: second attempt exited: rc=$rc"
+
+if [ "$rc" -ne 0 ]; then
+    # 两次都起不来：睡 5 秒再退出，给 greetd 的重拉一个退避间隔。
+    sleep 5
+fi
+exit "$rc"

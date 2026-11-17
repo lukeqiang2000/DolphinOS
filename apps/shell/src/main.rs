@@ -8,7 +8,7 @@
 
 mod logic;
 
-use slint::{Color, ModelRc, Timer, TimerMode, VecModel};
+use slint::{Color, ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use std::cell::RefCell;
 use std::process::Command;
 use std::rc::Rc;
@@ -97,6 +97,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let entries = Rc::new(RefCell::new(logic::apply_saved_order(&layout.order)));
 
     let ui = AppWindow::new()?;
+    // 桌面 Shell 占满整个输出：Alpha 8 在 VirtualBox 里浮动窗口（1280x800）
+    // 一次都没出现，改全屏是最彻底的兜底——窗口不再依赖合成器的摆放，
+    // 在任何分辨率下都完整可见；顶栏与卡片仍在 Shell 内部绘制。
+    ui.window().set_fullscreen(true);
     ui.set_clock(now_hhmm());
     ui.set_theme_name(settings.theme.as_str().into());
     ui.set_c_bg(parse_hex(palette.bg));

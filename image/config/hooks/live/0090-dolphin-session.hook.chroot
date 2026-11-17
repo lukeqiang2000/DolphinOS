@@ -11,8 +11,8 @@ if [ -f /etc/greetd/config.toml ]; then
     # Alpha 7 的裸 greeter 串，grep 不中便往文件末尾追加了一整节旧版
     # [default_session]，造成重复表、TOML 解析失败（镜像实读才发现）。
     # 以后改 default_session 命令，两处必须同步改。
-    grep -qF 'command = "/usr/bin/cage -s -- /usr/bin/dolphin-greeter"' /etc/greetd/config.toml || \
-        printf '\n[default_session]\ncommand = "/usr/bin/cage -s -- /usr/bin/dolphin-greeter"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
+    grep -qF 'command = "/usr/local/bin/dolphin-greeter-session"' /etc/greetd/config.toml || \
+        printf '\n[default_session]\ncommand = "/usr/local/bin/dolphin-greeter-session"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
 fi
 
 # 会话包装脚本必须在位且可执行：它负责 labwc 默认渲染失败时改用 pixman 软件渲染重试
@@ -21,6 +21,15 @@ if [ -f /usr/local/bin/dolphin-session ]; then
 else
     echo "警告: /usr/local/bin/dolphin-session 不存在，greetd 会话将无法启动" >&2
 fi
+
+# 登录屏会话包装与 Shell 启动器同样必须在位且可执行（Alpha 9 新增）
+for script in dolphin-greeter-session dolphin-shell-launcher; do
+    if [ -f "/usr/local/bin/$script" ]; then
+        chmod +x "/usr/local/bin/$script" || true
+    else
+        echo "警告: /usr/local/bin/$script 不存在" >&2
+    fi
+done
 
 # 自研二进制由 CI 在构建 ISO 前注入 includes.chroot/usr/bin，缺失时明确警告
 for bin in dolphin-greeter dolphin-shell dolphin-settings dolphin-files dolphin-terminal dolphin-browser dolphin-player dolphin-photos dolphin-oobe; do

@@ -11,8 +11,15 @@ set -e
 GRUB_CFG="boot/grub/grub.cfg"
 
 if [ -f "${GRUB_CFG}" ]; then
+    # Alpha 9：开机不显示菜单、直接进默认条目（模板 grub.cfg 里已有同款两行，
+    # 这里是双保险：若 live-build 换了模板处理方式，最终文件仍被强制改掉）。
+    # timeout_style=hidden 时倒计时内不显示菜单、只等按键；timeout=1 留一次
+    # 按住 Shift（BIOS）或 Esc（UEFI）调出菜单的恢复机会，超时即自动启动。
+    if ! grep -q 'timeout_style=hidden' "${GRUB_CFG}"; then
+        sed -i '/^source \/boot\/grub\/config.cfg$/a set timeout_style=hidden\nset timeout=1' "${GRUB_CFG}"
+    fi
     sed -i \
-        -e 's| fail-safe mode)| 安全模式)|g' \
+        -e 's| fail-safe mode)| Safe Mode)|g' \
         -e 's|Live system (|DolphinOS Alpha (|g' \
         -e 's|Live system, kernel |DolphinOS Alpha, kernel |g' \
         "${GRUB_CFG}"

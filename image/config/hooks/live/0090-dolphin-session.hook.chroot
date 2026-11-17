@@ -6,8 +6,13 @@
 set -e
 
 if [ -f /etc/greetd/config.toml ]; then
-    grep -q 'command = "/usr/bin/dolphin-greeter"' /etc/greetd/config.toml || \
-        printf '\n[default_session]\ncommand = "/usr/bin/dolphin-greeter"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
+    # 注意：这里的命令串必须与 includes.chroot 的 config.toml 里
+    # default_session 的 command 逐字一致。Alpha 8 首建时这里还留着
+    # Alpha 7 的裸 greeter 串，grep 不中便往文件末尾追加了一整节旧版
+    # [default_session]，造成重复表、TOML 解析失败（镜像实读才发现）。
+    # 以后改 default_session 命令，两处必须同步改。
+    grep -qF 'command = "/usr/bin/cage -s -- /usr/bin/dolphin-greeter"' /etc/greetd/config.toml || \
+        printf '\n[default_session]\ncommand = "/usr/bin/cage -s -- /usr/bin/dolphin-greeter"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
 fi
 
 # 会话包装脚本必须在位且可执行：它负责 labwc 默认渲染失败时改用 pixman 软件渲染重试

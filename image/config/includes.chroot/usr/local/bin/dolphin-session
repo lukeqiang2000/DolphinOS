@@ -1,10 +1,15 @@
 #!/bin/sh
 # DolphinOS 会话包装脚本（greetd default_session 的实际会话命令）
 #
-# 背景：labwc（wlroots）在没有 3D 加速的虚拟机里（如 VMware 未开 3D）会因
+# 背景一（渲染器）：labwc（wlroots）在没有 3D 加速的虚拟机里（如 VMware 未开 3D）会因
 # 渲染器初始化失败秒退：EGL_NOT_INITIALIZED / Failed to initialize EGL /
 # Could not initialize renderer。此时改用 wlroots 的 pixman 软件渲染器
 # 即可正常进入桌面，只是性能低一些。
+#
+# 背景二（光标）：虚拟机里 wlroots 的硬件光标平面常渲染失败——点击有效、
+# 右键菜单能出，但屏幕上看不见光标（2026-11-17 用户在 VirtualBox 试跑
+# Alpha 6 实测）。故全程强制软件光标（WLR_NO_HARDWARE_CURSORS=1），
+# 在脚本开头 export 一次，两条启动路径（默认渲染与 pixman 兜底）都带上。
 #
 # 逻辑：
 #   1. 先按默认方式启动 labwc；
@@ -16,6 +21,11 @@
 # 便于事后在 Live 系统里排查会话起不来的原因。
 
 LOG_FILE=/tmp/dolphin-session.log
+
+# 强制软件光标：虚拟机硬件光标平面渲染失败时光标不可见（见文件头背景二）。
+# export 一次即对下面两次 labwc 启动都生效（pixman 兜底只是在命令前再加
+# WLR_RENDERER=pixman 前缀，不影响已 export 的变量）。
+export WLR_NO_HARDWARE_CURSORS=1
 
 log_msg() {
     # 日志写不进去（例如 /tmp 不可写）也不能挡住会话启动

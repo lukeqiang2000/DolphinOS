@@ -55,16 +55,18 @@ jobs:
       # 参数名不同（--bootloader 单数等），直接在宿主机 sudo 跑必然失败。
       # 因此按 STAGE1-REPORT 的建议，在 debian:sid 特权容器里原样跑
       # image/build.sh：sid、amd64、labwc 默认会话等规格一字不改。
-      - name: Build ISO (debian:sid container, privileged)
+      # Alpha 7 起：容器里先用 sid 的 Rust 工具链 + WebKitGTK/GStreamer
+      # 开发包编译全部自研应用（release+strip），注入 includes.chroot/usr/bin
+      # 后再跑 build.sh；feature 试编失败自动降级默认版，不卡死 ISO 构建。
+      # 细节见 image/ci-build.sh。
+      - name: Build apps + ISO (debian:sid container, privileged)
         run: |
-          chmod +x image/build.sh
+          chmod +x image/build.sh image/ci-build.sh
           docker run --rm --privileged \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work/image \
             debian:sid \
-            sh -c "apt-get update \
-              && apt-get install -y --no-install-recommends live-build debootstrap debian-archive-keyring ca-certificates squashfs-tools xorriso mtools dosfstools isolinux syslinux-common grub-pc-bin grub-efi-amd64-bin \
-              && ./build.sh"
+            ./ci-build.sh
 
       - name: List ISO output
         run: ls -lh image/*.iso

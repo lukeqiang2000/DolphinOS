@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=浏览器
+Comment=DolphinOS 浏览器
+Exec=dolphin-browser
+Type=Application
+Categories=Network;WebBrowser;

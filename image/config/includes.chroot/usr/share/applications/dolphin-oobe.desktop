@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=首次设置
+Comment=DolphinOS 首次设置向导
+Exec=dolphin-oobe
+Type=Application
+Categories=Settings;

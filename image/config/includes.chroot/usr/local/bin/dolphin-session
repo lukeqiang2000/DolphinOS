@@ -1,0 +1,45 @@
+#!/bin/sh
+# DolphinOS 会话包装脚本（greetd default_session 的实际会话命令）
+#
+# 背景：labwc（wlroots）在没有 3D 加速的虚拟机里（如 VMware 未开 3D）会因
+# 渲染器初始化失败秒退：EGL_NOT_INITIALIZED / Failed to initialize EGL /
+# Could not initialize renderer。此时改用 wlroots 的 pixman 软件渲染器
+# 即可正常进入桌面，只是性能低一些。
+#
+# 逻辑：
+#   1. 先按默认方式启动 labwc；
+#   2. 若 labwc 运行不足 10 秒且以非 0 状态码退出，判定为启动失败，
+#      改用 WLR_RENDERER=pixman 再启动一次；
+#   3. 正常会话（用户登出才退出、或退出码为 0）不触发重试，直接透传退出码。
+# 两次尝试的起止时间、运行时长与退出码都写到 /tmp/dolphin-session.log，
+# labwc 自身的 stdout/stderr 追加写到 /tmp/labwc.log，
+# 便于事后在 Live 系统里排查会话起不来的原因。
+
+LOG_FILE=/tmp/dolphin-session.log
+
+log_msg() {
+    # 日志写不进去（例如 /tmp 不可写）也不能挡住会话启动
+    printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+start_ts=$(date +%s)
+log_msg "dolphin-session: first attempt: labwc $* (default renderer)"
+labwc "$@" >> /tmp/labwc.log 2>&1
+rc=$?
+end_ts=$(date +%s)
+elapsed=$((end_ts - start_ts))
+log_msg "dolphin-session: first attempt exited: rc=$rc elapsed=${elapsed}s"
+
+if [ "$rc" -eq 0 ] || [ "$elapsed" -ge 10 ]; then
+    # 正常退出，或已稳定运行过一段时间后才退出：不重试，透传退出码
+    exit "$rc"
+fi
+
+log_msg "dolphin-session: fast failure, retrying with WLR_RENDERER=pixman"
+start_ts=$(date +%s)
+WLR_RENDERER=pixman labwc "$@" >> /tmp/labwc.log 2>&1
+rc=$?
+end_ts=$(date +%s)
+elapsed=$((end_ts - start_ts))
+log_msg "dolphin-session: pixman attempt exited: rc=$rc elapsed=${elapsed}s"
+exit "$rc"

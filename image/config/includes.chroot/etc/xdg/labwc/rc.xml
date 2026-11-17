@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- DolphinOS labwc 基础配置（系统级 /etc/xdg/labwc，用户可在 ~/.config/labwc 覆盖）
+     Alpha 7：保证登录进桌面后有 Alt+Tab 切换与终端快捷键可用。 -->
+<labwc_config>
+  <keyboard>
+    <keybind key="A-Tab">
+      <action name="NextWindow" />
+    </keybind>
+    <keybind key="A-S-Tab">
+      <action name="PreviousWindow" />
+    </keybind>
+    <!-- Super+Enter：自研终端（主）；Super+Shift+Enter：foot 兜底终端 -->
+    <keybind key="W-Return">
+      <action name="Execute" command="dolphin-terminal" />
+    </keybind>
+    <keybind key="W-S-Return">
+      <action name="Execute" command="foot" />
+    </keybind>
+  </keyboard>
+</labwc_config>

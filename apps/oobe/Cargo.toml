@@ -1,0 +1,17 @@
+[package]
+name = "dolphin-oobe"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 首次设置向导（Slint）：语言/网络/账号/生物识别/主题/隐私/导入八步，结果写共享配置"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-oobe"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+dolphin-config = { path = "../dolphin-config" }
+
+[build-dependencies]
+slint-build = "1"

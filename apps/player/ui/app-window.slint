@@ -1,0 +1,156 @@
+// DolphinOS 视频播放器界面：左侧播放列表（当前项带 ▶ 高亮标记），
+// 右侧上方视频占位区（文件名 + 状态），底部控制条（播放/暂停、停止、
+// 上一首、下一首、进度滑杆 + 时间、音量滑杆）。
+
+import { Button, Slider, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in-out property <string> playlist-text: "";
+    in-out property <string> current-name: "未选择文件";
+    in-out property <string> state-text: "已停止";
+    in-out property <string> position-text: "00:00";
+    in-out property <string> duration-text: "00:00";
+    in-out property <float> progress-value: 0;
+    in-out property <float> progress-max: 0;
+    in-out property <float> volume: 80;
+    in-out property <bool> playing: false;
+
+    callback play-pause();
+    callback stop();
+    callback next-track();
+    callback prev-track();
+    callback seek(float);
+    callback volume-changed(float);
+
+    title: "Dolphin 播放器";
+    preferred-width: 960px;
+    preferred-height: 600px;
+    background: #0b0e11;
+
+    HorizontalLayout {
+        // 播放列表区
+        Rectangle {
+            width: 260px;
+            background: #10151b;
+
+            VerticalBox {
+                Text {
+                    text: "播放列表";
+                    color: #8fa3b8;
+                    font-size: 13px;
+                }
+
+                Text {
+                    text: root.playlist-text;
+                    color: #dbe4ee;
+                    font-size: 13px;
+                    wrap: no-wrap;
+                    vertical-stretch: 1;
+                }
+            }
+        }
+
+        VerticalLayout {
+            // 中央视频占位区（真实画面由 GStreamer 后端渲染，后续迭代接入）
+            Rectangle {
+                vertical-stretch: 1;
+                background: #05070a;
+
+                VerticalBox {
+                    alignment: center;
+
+                    Text {
+                        text: root.current-name;
+                        color: #e8eef4;
+                        font-size: 20px;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: root.state-text;
+                        color: #8fa3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // 底部控制条
+            Rectangle {
+                height: 92px;
+                background: #10151b;
+
+                VerticalBox {
+                    HorizontalBox {
+                        Text {
+                            text: root.position-text;
+                            color: #dbe4ee;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+
+                        Slider {
+                            minimum: 0;
+                            maximum: root.progress-max;
+                            value <=> root.progress-value;
+                            horizontal-stretch: 1;
+                            changed(value) => {
+                                root.seek(value);
+                            }
+                        }
+
+                        Text {
+                            text: root.duration-text;
+                            color: #dbe4ee;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    HorizontalBox {
+                        alignment: center;
+                        spacing: 8px;
+
+                        Button {
+                            text: "⏮ 上一首";
+                            clicked => { root.prev-track(); }
+                        }
+
+                        Button {
+                            text: root.playing ? "⏸ 暂停" : "▶ 播放";
+                            clicked => { root.play-pause(); }
+                        }
+
+                        Button {
+                            text: "⏹ 停止";
+                            clicked => { root.stop(); }
+                        }
+
+                        Button {
+                            text: "⏭ 下一首";
+                            clicked => { root.next-track(); }
+                        }
+
+                        Text {
+                            text: "音量";
+                            color: #8fa3b8;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+
+                        Slider {
+                            width: 110px;
+                            minimum: 0;
+                            maximum: 100;
+                            value: root.volume;
+                            changed(value) => {
+                                root.volume = value;
+                                root.volume-changed(value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

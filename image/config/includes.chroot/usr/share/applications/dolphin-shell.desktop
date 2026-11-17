@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=DolphinOS Shell
+Comment=DolphinOS 桌面 Shell
+Exec=dolphin-shell
+Type=Application
+Categories=System;

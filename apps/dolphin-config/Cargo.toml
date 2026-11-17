@@ -1,0 +1,10 @@
+[package]
+name = "dolphin-config"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 共享配置库：主题/动画/语言等设置读写 ~/.config/dolphinos/settings.toml，Shell 与各应用共用"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

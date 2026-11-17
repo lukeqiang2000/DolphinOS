@@ -1,0 +1,13 @@
+[package]
+name = "dolphin-settings"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 设置（Slint）：主题切换、打开动画三档、语言、隐私，与 Shell 共用 dolphin-config 同一份配置"
+license = "MIT"
+
+[dependencies]
+slint = "1"
+dolphin-config = { path = "../dolphin-config" }
+
+[build-dependencies]
+slint-build = "1"

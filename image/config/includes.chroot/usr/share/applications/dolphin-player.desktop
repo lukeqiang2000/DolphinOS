@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=视频
+Comment=DolphinOS 视频查看器
+Exec=dolphin-player
+Type=Application
+Categories=AudioVideo;Player;

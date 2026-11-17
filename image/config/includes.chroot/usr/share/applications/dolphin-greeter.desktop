@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=DolphinOS 登录屏
+Comment=DolphinOS 图形登录屏（由 greetd 拉起，不在应用菜单手动启动）
+Exec=dolphin-greeter
+Type=Application
+Categories=System;
+NoDisplay=true

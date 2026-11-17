@@ -1,0 +1,243 @@
+// DolphinOS 首次设置向导：顶部进度（第 x/8 步 + 步名）、中部按步切换内容、
+// 底部上一步/下一步（最后一步为完成）+ 校验提示。状态机在 wizard.rs。
+
+import { Button, LineEdit, CheckBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in-out property <int> step-index: 0;
+    in-out property <string> step-name: "语言";
+    in-out property <string> progress-text: "第 1/8 步";
+    in-out property <string> hint-text: "";
+    in-out property <string> network-name: "";
+    in-out property <string> account-name: "";
+    in-out property <string> account-password: "";
+    in-out property <string> import-path: "";
+    in-out property <bool> telemetry: false;
+    in-out property <bool> crash-reports: false;
+    in-out property <bool> can-go-back: false;
+    in-out property <string> selected-language: "zh-CN";
+    in-out property <string> selected-biometric: "跳过";
+    in-out property <string> selected-theme-name: "Dolphin";
+    in-out property <color> preview-bg: #0b0e11;
+    in-out property <color> preview-card: #1a2129;
+    in-out property <color> preview-accent: #1370f3;
+
+    callback next-step();
+    callback back-step();
+    callback finish();
+    callback select-language(string);
+    callback select-theme(string);
+    callback select-biometric(string);
+
+    title: "DolphinOS 首次设置";
+    preferred-width: 760px;
+    preferred-height: 560px;
+    background: #0b0e11;
+
+    VerticalLayout {
+        // 顶部进度
+        Rectangle {
+            height: 56px;
+            background: #10151b;
+
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 12px;
+
+                Text {
+                    text: "🐬 DolphinOS 设置向导";
+                    color: #e8eef4;
+                    font-size: 16px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {}
+
+                Text {
+                    text: root.progress-text + " · " + root.step-name;
+                    color: #8fa3b8;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 中部内容区（按步切换）
+        Rectangle {
+            background: #0b0e11;
+
+            // 1 语言
+            if root.step-index == 0: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "选择界面语言"; color: #e8eef4; font-size: 18px; }
+                Text { text: "当前选择：" + root.selected-language; color: #8fa3b8; font-size: 12px; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button { text: "简体中文"; clicked => { root.select-language("zh-CN"); } }
+                    Button { text: "English"; clicked => { root.select-language("en-US"); } }
+                    Button { text: "日本語"; clicked => { root.select-language("ja-JP"); } }
+                }
+                Rectangle {}
+            }
+
+            // 2 网络
+            if root.step-index == 1: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "连接网络"; color: #e8eef4; font-size: 18px; }
+                Text { text: "输入要连接的 Wi-Fi 名称，也可以跳过、稍后在设置里连接。"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                LineEdit {
+                    text <=> root.network-name;
+                    placeholder-text: "Wi-Fi 名称（可空 = 跳过）";
+                }
+                Rectangle {}
+            }
+
+            // 3 账号
+            if root.step-index == 2: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "创建本机账号"; color: #e8eef4; font-size: 18px; }
+                LineEdit {
+                    text <=> root.account-name;
+                    placeholder-text: "账号名（必填）";
+                }
+                LineEdit {
+                    text <=> root.account-password;
+                    placeholder-text: "密码（可空稍后设置；填了至少 4 位，不保存到磁盘）";
+                    input-type: InputType.password;
+                }
+                Rectangle {}
+            }
+
+            // 4 指纹/人脸
+            if root.step-index == 3: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "指纹 / 人脸解锁"; color: #e8eef4; font-size: 18px; }
+                Text { text: "当前选择：" + root.selected-biometric + "（真正录入在登录后于系统设置完成，这里只记录意向）"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button { text: "指纹"; clicked => { root.select-biometric("fingerprint"); } }
+                    Button { text: "人脸"; clicked => { root.select-biometric("face"); } }
+                    Button { text: "跳过"; clicked => { root.select-biometric("skip"); } }
+                }
+                Rectangle {}
+            }
+
+            // 5 主题
+            if root.step-index == 4: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "选择主题"; color: #e8eef4; font-size: 18px; }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button { text: "Dolphin"; clicked => { root.select-theme("Dolphin"); } }
+                    Button { text: "Metro"; clicked => { root.select-theme("Metro"); } }
+                    Button { text: "Fluent"; clicked => { root.select-theme("Fluent"); } }
+                    Button { text: "Pixel"; clicked => { root.select-theme("Pixel"); } }
+                }
+                Rectangle {
+                    height: 110px;
+                    border-radius: 12px;
+                    background: root.preview-bg;
+                    HorizontalLayout {
+                        padding: 14px;
+                        spacing: 12px;
+                        Rectangle {
+                            border-radius: 10px;
+                            background: root.preview-card;
+                            Text { text: root.selected-theme-name; color: #e8eef4; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                        Rectangle {
+                            width: 90px;
+                            border-radius: 10px;
+                            background: root.preview-accent;
+                            Text { text: "强调色"; color: #ffffff; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+                    }
+                }
+                Rectangle {}
+            }
+
+            // 6 隐私
+            if root.step-index == 5: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "隐私选项"; color: #e8eef4; font-size: 18px; }
+                Text { text: "两项默认关闭，开启后也随时可在设置里关掉。"; color: #8fa3b8; font-size: 12px; }
+                CheckBox {
+                    text: "发送匿名使用统计";
+                    checked <=> root.telemetry;
+                }
+                CheckBox {
+                    text: "发送崩溃报告";
+                    checked <=> root.crash-reports;
+                }
+                Rectangle {}
+            }
+
+            // 7 数据导入
+            if root.step-index == 6: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                Text { text: "导入已有数据"; color: #e8eef4; font-size: 18px; }
+                Text { text: "填写旧系统/备份的路径即可记录来源（实际拷贝后续进行），留空 = 跳过。"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                LineEdit {
+                    text <=> root.import-path;
+                    placeholder-text: "导入来源路径（可空 = 跳过）";
+                }
+                Rectangle {}
+            }
+
+            // 8 完成
+            if root.step-index == 7: VerticalLayout {
+                padding: 28px;
+                spacing: 12px;
+                alignment: center;
+                Text { text: "🎉 设置完成"; color: #e8eef4; font-size: 22px; horizontal-alignment: center; }
+                Text { text: "设置已保存，欢迎使用 DolphinOS。"; color: #8fa3b8; font-size: 13px; horizontal-alignment: center; }
+            }
+        }
+
+        // 底部导航
+        Rectangle {
+            height: 64px;
+            background: #10151b;
+
+            HorizontalLayout {
+                padding: 14px;
+                spacing: 12px;
+
+                Text {
+                    text: root.hint-text;
+                    color: #ffb454;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {}
+
+                Button {
+                    text: "上一步";
+                    enabled: root.can-go-back;
+                    clicked => { root.back-step(); }
+                }
+
+                if root.step-index < 6: Button {
+                    text: "下一步";
+                    primary: true;
+                    clicked => { root.next-step(); }
+                }
+
+                if root.step-index == 6: Button {
+                    text: "完成";
+                    primary: true;
+                    clicked => { root.finish(); }
+                }
+            }
+        }
+    }
+}

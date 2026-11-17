@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=照片
+Comment=DolphinOS 照片查看器
+Exec=dolphin-photos
+Type=Application
+Categories=Graphics;Viewer;

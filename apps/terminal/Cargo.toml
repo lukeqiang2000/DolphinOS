@@ -1,0 +1,18 @@
+[package]
+name = "dolphin-terminal"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 自研终端（Slint 界面 + portable-pty + vte 解析）"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-terminal"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+portable-pty = "0.8"
+vte = "0.15"
+
+[build-dependencies]
+slint-build = "1"

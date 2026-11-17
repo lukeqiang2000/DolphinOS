@@ -1,0 +1,18 @@
+[package]
+name = "dolphin-greeter"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 自研图形登录屏（Slint）：经 greetd IPC 协议与 greetd/PAM 完成校验并启动 labwc 会话"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-greeter"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+slint-build = "1"

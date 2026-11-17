@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=设置
+Comment=DolphinOS 设置
+Exec=dolphin-settings
+Type=Application
+Categories=Settings;

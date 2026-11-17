@@ -1,0 +1,130 @@
+// DolphinOS 浏览器（Slint 壳）：工具栏（后退/前进/刷新/主页 + 地址栏）
+// + 标签标题区 + 状态栏。页面渲染由 WebKitGTK（feature webkit）或系统浏览器承担。
+
+import { Button, LineEdit } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in-out property <string> address-text: "";
+    in-out property <string> current-url: "";
+    in-out property <string> page-title: "新标签页";
+    in-out property <string> status-text: "";
+    in-out property <bool> can-back: false;
+    in-out property <bool> can-forward: false;
+
+    callback navigate(string);
+    callback go-back();
+    callback go-forward();
+    callback reload();
+    callback go-home();
+
+    title: "Dolphin 浏览器";
+    preferred-width: 1024px;
+    preferred-height: 720px;
+    background: #0b0e11;
+
+    VerticalLayout {
+        // 工具栏
+        Rectangle {
+            height: 52px;
+            background: #10151b;
+
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 8px;
+
+                Button {
+                    text: "←";
+                    enabled: root.can-back;
+                    clicked => { root.go-back(); }
+                }
+
+                Button {
+                    text: "→";
+                    enabled: root.can-forward;
+                    clicked => { root.go-forward(); }
+                }
+
+                Button {
+                    text: "⟳";
+                    clicked => { root.reload(); }
+                }
+
+                Button {
+                    text: "主页";
+                    clicked => { root.go-home(); }
+                }
+
+                LineEdit {
+                    text <=> root.address-text;
+                    placeholder-text: "输入网址或搜索词，回车打开";
+                    accepted(text) => { root.navigate(text); }
+                }
+            }
+        }
+
+        // 标签标题区：显示当前页标题与 URL
+        Rectangle {
+            height: 40px;
+            background: #1a2129;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 10px;
+
+                Text {
+                    text: "🌐";
+                    font-size: 15px;
+                    vertical-alignment: center;
+                }
+
+                VerticalLayout {
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+
+                    Text {
+                        text: root.page-title;
+                        color: #e8eef4;
+                        font-size: 13px;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: root.current-url == "" ? "尚未打开页面" : root.current-url;
+                        color: #8fa3b8;
+                        font-size: 11px;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+
+        // 内容占位区（默认构建无内嵌引擎，页面在系统浏览器中打开）
+        Rectangle {
+            background: #0b0e11;
+
+            Text {
+                text: "页面内容区\n（WebKitGTK 内嵌引擎需以 --features webkit 构建）";
+                color: #5b6b7c;
+                font-size: 14px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        // 状态栏
+        Rectangle {
+            height: 26px;
+            background: #10151b;
+
+            Text {
+                text: root.status-text;
+                color: #8fa3b8;
+                font-size: 11px;
+                vertical-alignment: center;
+                x: 12px;
+                overflow: elide;
+            }
+        }
+    }
+}

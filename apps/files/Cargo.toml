@@ -1,0 +1,16 @@
+[package]
+name = "dolphin-files"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 文件管理器（Slint）"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-files"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+
+[build-dependencies]
+slint-build = "1"

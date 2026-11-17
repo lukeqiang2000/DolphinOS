@@ -1,0 +1,26 @@
+[package]
+name = "dolphin-browser"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 自研浏览器（Slint 壳）：WebKitGTK 内核为可选 feature，本机默认构建走系统浏览器"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-browser"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+
+# WebKit 内嵌引擎（可选，默认关闭）：需要系统装有 libwebkit2gtk-4.1-dev
+# 才能编译 gtk / webkit2gtk 的 -sys 绑定；本开发机只有运行时、无 -dev，
+# 因此默认构建不启用，导航时退回 xdg-open 调系统浏览器。
+gtk = { version = "0.18", optional = true }
+webkit2gtk = { version = "2.0", optional = true }
+
+[features]
+default = []
+webkit = ["dep:gtk", "dep:webkit2gtk"]
+
+[build-dependencies]
+slint-build = "1"

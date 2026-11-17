@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=终端
+Comment=DolphinOS 终端
+Exec=dolphin-terminal
+Type=Application
+Categories=System;TerminalEmulator;

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DolphinOS labwc 根菜单（系统级 /etc/xdg/labwc）：右键桌面弹出 -->
+<openbox_menu>
+  <menu id="root-menu" label="DolphinOS">
+    <item label="终端（自研）">
+      <action name="Execute"><command>dolphin-terminal</command></action>
+    </item>
+    <item label="终端（foot 兜底）">
+      <action name="Execute"><command>foot</command></action>
+    </item>
+    <item label="文件管理器">
+      <action name="Execute"><command>dolphin-files</command></action>
+    </item>
+    <item label="浏览器">
+      <action name="Execute"><command>dolphin-browser</command></action>
+    </item>
+    <item label="设置">
+      <action name="Execute"><command>dolphin-settings</command></action>
+    </item>
+    <separator />
+    <item label="Reconfigure">
+      <action name="Reconfigure" />
+    </item>
+    <item label="Exit">
+      <action name="Exit" />
+    </item>
+  </menu>
+</openbox_menu>

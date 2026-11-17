@@ -1,0 +1,94 @@
+// DolphinOS 照片查看器：中央大图区 + 底部导航与信息栏。左右方向键可切换。
+import { Button } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in property <image> current-image;
+    in property <bool> has-image: false;
+    in-out property <string> info-text: "没有照片";
+    in-out property <string> status-text: "";
+
+    callback prev-photo();
+    callback next-photo();
+    callback open-folder();
+
+    title: "照片 - DolphinOS";
+    preferred-width: 960px;
+    preferred-height: 680px;
+    background: #0b0e11;
+
+    FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.LeftArrow) {
+                root.prev-photo();
+                return accept;
+            }
+            if (event.text == Key.RightArrow) {
+                root.next-photo();
+                return accept;
+            }
+            return reject;
+        }
+
+        VerticalLayout {
+            // 中央大图区
+            Rectangle {
+                background: #05070a;
+                if root.has-image: Image {
+                    source: root.current-image;
+                    image-fit: contain;
+                    width: 100%;
+                    height: 100%;
+                }
+                if !root.has-image: Text {
+                    text: "该文件夹里没有可显示的照片";
+                    color: #5b6b7c;
+                    font-size: 15px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 底部栏：上一张 / 信息 / 打开文件夹 / 下一张
+            Rectangle {
+                height: 48px;
+                background: #10151b;
+
+                HorizontalLayout {
+                    padding: 6px;
+                    spacing: 8px;
+
+                    Button {
+                        text: "← 上一张";
+                        width: 100px;
+                        clicked => { root.prev-photo(); }
+                    }
+                    Text {
+                        text: root.info-text;
+                        color: #dbe4ee;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.status-text;
+                        color: #e0a458;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    Button {
+                        text: "打开文件夹";
+                        width: 110px;
+                        clicked => { root.open-folder(); }
+                    }
+                    Button {
+                        text: "下一张 →";
+                        width: 100px;
+                        clicked => { root.next-photo(); }
+                    }
+                }
+            }
+        }
+    }
+}

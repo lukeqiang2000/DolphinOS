@@ -1,0 +1,94 @@
+// DolphinOS 图形登录屏：居中登录卡（用户名 + 密码 + 登录），
+//! 下方指纹 / 人脸两个预留入口，底部状态/错误文本。
+
+import { Button, LineEdit } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    in-out property <string> username: "";
+    in-out property <string> password: "";
+    in-out property <string> status-text: "";
+
+    callback try-login(string, string);
+    callback fingerprint();
+    callback face();
+
+    title: "DolphinOS 登录";
+    preferred-width: 800px;
+    preferred-height: 600px;
+    background: #0b0e11;
+
+    VerticalLayout {
+        alignment: center;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 360px;
+                border-radius: 18px;
+                background: #1a2129;
+                border-width: 1px;
+                border-color: #2b3644;
+
+                VerticalLayout {
+                    padding: 28px;
+                    spacing: 14px;
+
+                    Text {
+                        text: "🐬 DolphinOS";
+                        color: #e8eef4;
+                        font-size: 24px;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: "登录到你的桌面";
+                        color: #8fa3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                    }
+
+                    LineEdit {
+                        text <=> root.username;
+                        placeholder-text: "用户名";
+                    }
+
+                    LineEdit {
+                        text <=> root.password;
+                        placeholder-text: "密码";
+                        input-type: InputType.password;
+                        accepted => { root.try-login(root.username, root.password); }
+                    }
+
+                    Button {
+                        text: "登录";
+                        primary: true;
+                        clicked => { root.try-login(root.username, root.password); }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+
+                        Button {
+                            text: "指纹登录";
+                            clicked => { root.fingerprint(); }
+                        }
+
+                        Button {
+                            text: "人脸登录";
+                            clicked => { root.face(); }
+                        }
+                    }
+
+                    Text {
+                        text: root.status-text;
+                        color: #ffb454;
+                        font-size: 12px;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}

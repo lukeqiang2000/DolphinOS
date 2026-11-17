@@ -2,13 +2,16 @@
 name = "dolphin-shell"
 version = "0.1.0"
 edition = "2021"
-description = "DolphinOS 桌面 Shell（Slint）：窄顶栏 + 板块网格桌面"
+description = "DolphinOS 桌面 Shell（Slint）：28px 窄顶栏 + 板块网格桌面 + 多主题 + 翻转打开动画"
 license = "MIT"
 
 [dependencies]
 slint = "1"
 dolphin-shape = { path = "../dolphin-shape" }
+dolphin-config = { path = "../dolphin-config" }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [build-dependencies]
 slint-build = "1"

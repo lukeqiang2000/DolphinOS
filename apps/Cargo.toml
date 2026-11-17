@@ -1,3 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["dolphin-shape", "shell"]
+members = [
+    "dolphin-shape",
+    "dolphin-config",
+    "shell",
+    "settings",
+    "greeter",
+    "files",
+    "terminal",
+    "browser",
+    "player",
+    "photos",
+    "oobe",
+]

@@ -1,13 +1,30 @@
 #!/bin/sh
 # DolphinOS 会话收尾 hook（chroot 阶段执行）：
-# 1. 确保 greetd 默认会话指向 labwc（与 includes.chroot 的 config.toml 双保险）。
+# 1. 确保 greetd 默认会话指向自研图形登录屏 dolphin-greeter（与 includes.chroot 的 config.toml 双保险）。
+#    登录成功后由 greeter 请求启动 /usr/local/bin/dolphin-session 包装脚本拉起 labwc。
 # 2. 启用 greetd 与 seatd 服务，保证开机进登录链、非 root 会话能拿到 seat。
 set -e
 
 if [ -f /etc/greetd/config.toml ]; then
-    grep -q '/usr/sbin/agreety --cmd labwc' /etc/greetd/config.toml || \
-        printf '\n[default_session]\ncommand = "/usr/sbin/agreety --cmd labwc"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
+    grep -q 'command = "/usr/bin/dolphin-greeter"' /etc/greetd/config.toml || \
+        printf '\n[default_session]\ncommand = "/usr/bin/dolphin-greeter"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
 fi
+
+# 会话包装脚本必须在位且可执行：它负责 labwc 默认渲染失败时改用 pixman 软件渲染重试
+if [ -f /usr/local/bin/dolphin-session ]; then
+    chmod +x /usr/local/bin/dolphin-session || true
+else
+    echo "警告: /usr/local/bin/dolphin-session 不存在，greetd 会话将无法启动" >&2
+fi
+
+# 自研二进制由 CI 在构建 ISO 前注入 includes.chroot/usr/bin，缺失时明确警告
+for bin in dolphin-greeter dolphin-shell dolphin-settings dolphin-files dolphin-terminal dolphin-browser dolphin-player dolphin-photos dolphin-oobe; do
+    if [ -f "/usr/bin/$bin" ]; then
+        chmod +x "/usr/bin/$bin" || true
+    else
+        echo "警告: /usr/bin/$bin 不存在（CI 未注入自研二进制？）" >&2
+    fi
+done
 
 systemctl enable greetd.service 2>/dev/null || true
 systemctl enable seatd.service 2>/dev/null || true

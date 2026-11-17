@@ -1,0 +1,129 @@
+// DolphinOS 设置：主题 / 打开动画 / 语言 / 隐私。改动即时保存到 ~/.config/dolphinos/settings.toml。
+
+import { ScrollView } from "std-widgets.slint";
+
+component OptionRow inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    in property <color> accent-col;
+    callback picked();
+
+    height: 40px;
+    border-radius: 8px;
+    background: root.selected ? root.accent-col : #2a2f36;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        Text {
+            text: root.label;
+            color: #ffffff;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+        Rectangle {}
+        Text {
+            text: root.selected ? "●" : "○";
+            color: #ffffff;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea { clicked => { root.picked(); } }
+}
+
+component ToggleRow inherits Rectangle {
+    in property <string> label;
+    in property <string> hint;
+    in property <bool> on;
+    callback toggled();
+
+    height: 52px;
+    border-radius: 8px;
+    background: #2a2f36;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        VerticalLayout {
+            alignment: center;
+            Text { text: root.label; color: #ffffff; font-size: 14px; }
+            Text { text: root.hint; color: #9aa4ae; font-size: 11px; }
+        }
+        Rectangle {}
+        Text {
+            text: root.on ? "已开" : "已关";
+            color: root.on ? #7dd3a8 : #9aa4ae;
+            font-size: 13px;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea { clicked => { root.toggled(); } }
+}
+
+export component AppWindow inherits Window {
+    in-out property <int> theme-index: 0;
+    in-out property <int> animation-index: 0;
+    in-out property <int> language-index: 0;
+    in-out property <bool> telemetry: false;
+    in-out property <bool> crash-reports: false;
+    in property <string> config-path: "";
+    in property <string> status-text: "";
+
+    callback theme-picked(int);
+    callback animation-picked(int);
+    callback language-picked(int);
+    callback toggle-telemetry();
+    callback toggle-crash();
+
+    title: "DolphinOS 设置";
+    preferred-width: 720px;
+    preferred-height: 640px;
+    background: #17191d;
+
+    ScrollView {
+        VerticalLayout {
+            padding: 20px;
+            spacing: 10px;
+            alignment: start;
+
+            Text { text: "设置"; color: #ffffff; font-size: 22px; }
+            Text { text: "配置文件：" + root.config-path; color: #9aa4ae; font-size: 11px; }
+
+            Text { text: "主题（整套形态皮肤）"; color: #c8d2dc; font-size: 15px; }
+            OptionRow { label: "Dolphin（默认）"; selected: root.theme-index == 0; accent-col: #1370f3; picked => { root.theme-picked(0); } }
+            OptionRow { label: "Metro（仿 Windows 8）"; selected: root.theme-index == 1; accent-col: #1370f3; picked => { root.theme-picked(1); } }
+            OptionRow { label: "Fluent（仿 Windows 10）"; selected: root.theme-index == 2; accent-col: #1370f3; picked => { root.theme-picked(2); } }
+            OptionRow { label: "Pixel（仿 Google Pixel）"; selected: root.theme-index == 3; accent-col: #1370f3; picked => { root.theme-picked(3); } }
+
+            Text { text: "打开动画"; color: #c8d2dc; font-size: 15px; }
+            OptionRow { label: "翻转打开"; selected: root.animation-index == 0; accent-col: #1370f3; picked => { root.animation-picked(0); } }
+            OptionRow { label: "弹入打开"; selected: root.animation-index == 1; accent-col: #1370f3; picked => { root.animation-picked(1); } }
+            OptionRow { label: "无动画"; selected: root.animation-index == 2; accent-col: #1370f3; picked => { root.animation-picked(2); } }
+
+            Text { text: "语言"; color: #c8d2dc; font-size: 15px; }
+            OptionRow { label: "简体中文"; selected: root.language-index == 0; accent-col: #1370f3; picked => { root.language-picked(0); } }
+            OptionRow { label: "English"; selected: root.language-index == 1; accent-col: #1370f3; picked => { root.language-picked(1); } }
+
+            Text { text: "隐私"; color: #c8d2dc; font-size: 15px; }
+            ToggleRow { label: "匿名使用统计"; hint: "默认关。开启后仅发送匿名统计，不含个人文件。"; on: root.telemetry; toggled => { root.toggle-telemetry(); } }
+            ToggleRow { label: "崩溃报告上传"; hint: "默认关。开启后崩溃时上传报告帮助改进。"; on: root.crash-reports; toggled => { root.toggle-crash(); } }
+
+            Text { text: "更新"; color: #c8d2dc; font-size: 15px; }
+            Text {
+                text: "日常小更新走 apt，整版大升级走 DolphinOS 升级通道（alpha/beta/stable）；在本系统里请用系统更新工具检查，此页仅记录设置。";
+                color: #9aa4ae;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            if root.status-text != "": Text {
+                text: root.status-text;
+                color: #7dd3a8;
+                font-size: 12px;
+            }
+        }
+    }
+}

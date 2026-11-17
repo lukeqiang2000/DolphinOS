@@ -1,17 +1,31 @@
-# DolphinOS 第一阶段包列表（chroot 阶段安装）
+# DolphinOS 包列表（chroot 阶段安装）
 # Live 基础
 live-boot
 live-config
 systemd-sysv
 
-# Wayland 会话与登录链（greeter 就绪前用 greetd + agreety 占位）
+# Wayland 会话与登录链（Alpha 7：greetd + 自研 dolphin-greeter；
+# agreety 是 greetd 包自带、无独立包，保留无妨但不再是默认会话）
 labwc
 seatd
 greetd
 
-# 占位应用（自研版就绪后逐个换包）
+# 桌面兜底与终端兜底
+# swaybg：登录后蓝底兜底（Shell 没起来时证明合成器活着）
+# foot：Super+Shift+Enter 兜底终端（主终端已换自研 dolphin-terminal）
+# thunar 已移除：文件管理由自研 dolphin-files 接替
+swaybg
 foot
-thunar
+
+# 自研应用运行时库（dolphin-* 二进制由 CI 注入 /usr/bin）
+# Slint 运行时、浏览器 WebKit 内核运行时、播放器 GStreamer 运行时
+libfontconfig1
+libxkbcommon0
+libwebkit2gtk-4.1-0
+libgstreamer1.0-0
+libgstreamer-plugins-base1.0-0
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
 
 # 网络与多媒体栈
 network-manager

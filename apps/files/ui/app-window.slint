@@ -1,0 +1,143 @@
+// DolphinOS 文件管理器：顶部导航栏 + 条目列表 + 底部状态栏。
+import { Button, CheckBox, ListView } from "std-widgets.slint";
+
+export struct FileEntry {
+    name: string,
+    path: string,
+    is-dir: bool,
+    size-text: string,
+    icon: string,
+}
+
+export component AppWindow inherits Window {
+    in property <[FileEntry]> entries: [];
+    in-out property <string> current-path: "";
+    in-out property <string> status-text: "";
+    in-out property <bool> can-back: false;
+    in-out property <bool> can-forward: false;
+    in-out property <bool> show-hidden: false;
+    in-out property <int> selected-index: -1;
+
+    callback navigate-back();
+    callback navigate-forward();
+    callback navigate-up();
+    callback toggle-hidden(bool);
+    callback entry-selected(int);
+    callback entry-activated(int);
+
+    title: "文件 - DolphinOS";
+    preferred-width: 900px;
+    preferred-height: 600px;
+    background: #0f141a;
+
+    VerticalLayout {
+        // 顶部导航栏
+        Rectangle {
+            height: 44px;
+            background: #161d26;
+
+            HorizontalLayout {
+                padding: 6px;
+                spacing: 6px;
+
+                Button {
+                    text: "←";
+                    width: 36px;
+                    enabled: root.can-back;
+                    clicked => { root.navigate-back(); }
+                }
+                Button {
+                    text: "→";
+                    width: 36px;
+                    enabled: root.can-forward;
+                    clicked => { root.navigate-forward(); }
+                }
+                Button {
+                    text: "↑ 上级";
+                    width: 64px;
+                    clicked => { root.navigate-up(); }
+                }
+                Rectangle {
+                    background: #0b0f14;
+                    border-radius: 8px;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        Text {
+                            text: root.current-path;
+                            color: #dbe4ee;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                }
+                CheckBox {
+                    text: "隐藏文件";
+                    checked: root.show-hidden;
+                    toggled => { root.toggle-hidden(self.checked); }
+                }
+            }
+        }
+
+        // 条目列表
+        ListView {
+            for entry[idx] in root.entries: Rectangle {
+                height: 36px;
+                background: idx == root.selected-index ? #1d3a5f : (mod(idx, 2) == 0 ? #12181f : #0f141a);
+                border-radius: 8px;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 10px;
+
+                    Text {
+                        text: entry.icon;
+                        font-size: 16px;
+                        width: 28px;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: entry.name;
+                        color: entry.is-dir ? #7cc4ff : #dbe4ee;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    Rectangle { }
+                    Text {
+                        text: entry.size-text;
+                        color: #8fa3b8;
+                        font-size: 12px;
+                        width: 90px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+
+                TouchArea {
+                    clicked => { root.entry-selected(idx); }
+                    double-clicked => { root.entry-activated(idx); }
+                }
+            }
+        }
+
+        // 底部状态栏
+        Rectangle {
+            height: 28px;
+            background: #10151b;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                Text {
+                    text: root.status-text;
+                    color: #8fa3b8;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

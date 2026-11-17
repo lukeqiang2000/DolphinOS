@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=文件
+Comment=DolphinOS 文件管理器
+Exec=dolphin-files
+Type=Application
+Categories=System;FileManager;

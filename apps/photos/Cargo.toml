@@ -1,0 +1,17 @@
+[package]
+name = "dolphin-photos"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 照片查看器（Slint + image）"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-photos"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+
+[build-dependencies]
+slint-build = "1"

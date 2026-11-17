@@ -1,8 +1,10 @@
-# greetd 配置（第一阶段占位：自研登录屏就绪后替换 agreety）
-# 默认会话 = labwc（DolphinOS 的 Wayland 会话）；登录后由 labwc 拉起自研 Shell。
+# greetd 配置（Alpha 7：自研图形登录屏 dolphin-greeter 替换 agreety 占位）
+# dolphin-greeter 经 greetd IPC 与 greetd 通信、由 PAM 在服务端校验密码；
+# 登录成功后 greeter 请求启动的会话命令是 /usr/local/bin/dolphin-session
+# （包装脚本：拉起 labwc，渲染失败时自动改用 pixman 软件渲染重试）。
 [terminal]
 vt = 1
 
 [default_session]
-command = "/usr/sbin/agreety --cmd labwc"
+command = "/usr/bin/dolphin-greeter"
 user = "_greetd"

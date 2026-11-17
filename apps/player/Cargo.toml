@@ -1,0 +1,22 @@
+[package]
+name = "dolphin-player"
+version = "0.1.0"
+edition = "2021"
+description = "DolphinOS 自研视频播放器（Slint 界面 + 可插拔播放后端）"
+license = "MIT"
+
+[[bin]]
+name = "dolphin-player"
+path = "src/main.rs"
+
+[features]
+# GStreamer 后端：需要系统装有 libgstreamer1.0-dev（pkg-config 能找到
+# gstreamer-1.0）才能构建；默认关闭，默认构建只用模拟后端。
+gst = ["dep:gstreamer"]
+
+[dependencies]
+slint = "1"
+gstreamer = { version = "0.23", optional = true }
+
+[build-dependencies]
+slint-build = "1"

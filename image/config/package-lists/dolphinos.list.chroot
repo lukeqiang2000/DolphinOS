@@ -4,6 +4,10 @@ live-boot
 live-config
 systemd-sysv
 
+# 开机动画（自研 dolphin script 主题在 includes.chroot 里，
+# 默认主题切换与 initramfs 重建见 0100-plymouth-theme.hook.chroot）
+plymouth
+
 # Wayland 会话与登录链（Alpha 7：greetd + 自研 dolphin-greeter；
 # agreety 是 greetd 包自带、无独立包，保留无妨但不再是默认会话）
 labwc

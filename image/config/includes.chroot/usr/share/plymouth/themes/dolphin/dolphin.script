@@ -1,0 +1,47 @@
+# DolphinOS 开机动画（Plymouth script 主题）
+#
+# 规格（用户定案）：SVG 简笔画海豚动画、无加载条、简洁感参考 Pixel
+# 首次开机动画。这里用同一套海豚线稿的 12 帧 PNG 循环游动实现
+# （帧图由 image/boot-assets/generate.py 生成），不画任何进度条：
+# 不注册 BootProgress 回调，画面里也没有进度条元素。
+# 背景深蓝渐变与 GRUB 菜单背景（splash.svg）同色系，菜单 → 动画 →
+# 登录衔接时色调不断层。
+
+Window.SetBackgroundTopColor (0.05, 0.39, 0.85);
+Window.SetBackgroundBottomColor (0.02, 0.08, 0.19);
+
+frames = [];
+frames[0] = Image ("frame-00.png");
+frames[1] = Image ("frame-01.png");
+frames[2] = Image ("frame-02.png");
+frames[3] = Image ("frame-03.png");
+frames[4] = Image ("frame-04.png");
+frames[5] = Image ("frame-05.png");
+frames[6] = Image ("frame-06.png");
+frames[7] = Image ("frame-07.png");
+frames[8] = Image ("frame-08.png");
+frames[9] = Image ("frame-09.png");
+frames[10] = Image ("frame-10.png");
+frames[11] = Image ("frame-11.png");
+
+sprite = Sprite (frames[0]);
+sprite.SetPosition (Window.GetX () + Window.GetWidth () / 2 - frames[0].GetWidth () / 2,
+                    Window.GetY () + Window.GetHeight () / 2 - frames[0].GetHeight () / 2,
+                    0);
+
+frame_counter = 0;
+
+# refresh 约 50 次/秒（script 插件的既定节奏）：每 3 次换一帧，
+# 12 帧一圈约 0.7 秒。帧序号用减法取余，避免依赖取模运算符。
+fun refresh_callback ()
+  {
+    frame_counter++;
+    step = Math.Int (frame_counter / 3);
+    idx = step - Math.Int (step / 12) * 12;
+    sprite.SetImage (frames[idx]);
+    sprite.SetPosition (Window.GetX () + Window.GetWidth () / 2 - frames[idx].GetWidth () / 2,
+                        Window.GetY () + Window.GetHeight () / 2 - frames[idx].GetHeight () / 2,
+                        0);
+  }
+
+Plymouth.SetRefreshFunction (refresh_callback);

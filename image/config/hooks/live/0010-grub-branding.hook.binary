@@ -1,0 +1,19 @@
+#!/bin/sh
+# DolphinOS 品牌化：改写 live-build 生成的 GRUB 条目标签。
+#
+# 「Live system (...)」这类标签是 live-build 的 binary_grub_cfg 脚本在
+# 代码里写死拼接后注入 grub.cfg 的，config/bootloaders 的模板覆盖改
+# 不到它。binary_hooks 在 binary 阶段末尾运行（grub_cfg、splash 都已
+# 生成，ISO 尚未打包），是唯一能改到最终 grub.cfg 的口子。
+# 本 hook 运行时工作目录为 binary/（live-build 约定），故路径相对它写。
+set -e
+
+GRUB_CFG="boot/grub/grub.cfg"
+
+if [ -f "${GRUB_CFG}" ]; then
+    sed -i \
+        -e 's| fail-safe mode)| 安全模式)|g' \
+        -e 's|Live system (|DolphinOS Alpha (|g' \
+        -e 's|Live system, kernel |DolphinOS Alpha, kernel |g' \
+        "${GRUB_CFG}"
+fi

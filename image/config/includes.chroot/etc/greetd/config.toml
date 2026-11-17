@@ -8,3 +8,16 @@ vt = 1
 [default_session]
 command = "/usr/bin/dolphin-greeter"
 user = "_greetd"
+
+# Live 自动登录（用户 2026-11-17 定案，Alpha 8 起）：Live 模式开机不经
+# 登录屏，直接以 live 用户 user 启动桌面会话，会话命令与密码登录成功后
+# greeter 请求启动的那条保持一致。
+# greetd(5) 语义：initial_session 只在本次开机后 greetd 首次运行时执行
+# 一次（靠 /run 下的 runfile 防重入，重启即失效），会话退出/登出后
+# greetd 自动转入 default_session（登录屏），不会再次自动登录。
+# 注意：本节只应存在于 Live 镜像；装到硬盘后的系统必须去掉本节回到
+# 密码登录——由安装环节处理（建议见 BOOT-EXPERIENCE-REPORT.md），
+# 本文件不区分 Live/已安装两种形态。
+[initial_session]
+command = "/usr/local/bin/dolphin-session"
+user = "user"

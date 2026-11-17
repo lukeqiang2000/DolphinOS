@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Dolphin
+Description=DolphinOS boot animation: line-art dolphin, no progress bar
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/dolphin
+ScriptFile=/usr/share/plymouth/themes/dolphin/dolphin.script

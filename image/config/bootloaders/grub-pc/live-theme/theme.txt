@@ -1,0 +1,58 @@
+# DolphinOS GRUB 主题（覆盖 live-build 默认 live-theme）
+# 背景图 ../splash.png 由 config/bootloaders/splash.svg 在构建时生成，
+# 标题文字已画进背景图，所以 title-text 留空（与默认主题的做法一致）。
+# 选中项蓝条用同目录 select_*.png 九宫格切片（generate.py 生成）。
+
+desktop-image: "../splash.png"
+desktop-color: "#05224d"
+title-text: ""
+title-color: "#ffffff"
+title-font: "Unifont Regular 16"
+message-font: "Unifont Regular 16"
+terminal-font: "Unifont Regular 16"
+
+# 底部帮助栏
++ label {
+        top = 100%-50
+        left = 0
+        width = 100%
+        height = 20
+        text = "@KEYMAP_SHORT@"
+        align = "center"
+        color = "#8fa3b8"
+        font = "Unifont Regular 16"
+}
+
+# 启动菜单
++ boot_menu {
+        left = 10%
+        width = 80%
+        top = 58%
+        height = 42%-92
+        item_color = "#b9d6ff"
+        item_font = "Unifont Regular 16"
+        selected_item_color = "#ffffff"
+        selected_item_font = "Unifont Regular 16"
+        selected_item_pixmap_style = "select_*"
+        item_height = 20
+        item_padding = 6
+        item_spacing = 6
+        icon_width = 0
+        icon_height = 0
+        item_icon_space = 0
+}
+
+# 自动启动倒计时条（菜单超时提示，不是加载进度条）
++ progress_bar {
+        id = "__timeout__"
+        left = 15%
+        top = 100%-80
+        height = 16
+        width = 70%
+        font = "Unifont Regular 16"
+        text_color = "#dceeff"
+        fg_color = "#1370f3"
+        bg_color = "#0a1c33"
+        border_color = "#2f7fe0"
+        text = "@TIMEOUT_NOTIFICATION_LONG@"
+}

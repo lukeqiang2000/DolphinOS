@@ -6,7 +6,7 @@ set -e
 
 if [ -f /etc/greetd/config.toml ]; then
     grep -q 'agreety --cmd labwc' /etc/greetd/config.toml || \
-        printf '\n[default_session]\ncommand = "agreety --cmd labwc"\nuser = "greeter"\n' >> /etc/greetd/config.toml
+        printf '\n[default_session]\ncommand = "agreety --cmd labwc"\nuser = "_greetd"\n' >> /etc/greetd/config.toml
 fi
 
 systemctl enable greetd.service 2>/dev/null || true

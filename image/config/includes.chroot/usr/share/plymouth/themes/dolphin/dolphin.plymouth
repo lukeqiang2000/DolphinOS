@@ -1,6 +1,6 @@
 [Plymouth Theme]
 Name=Dolphin
-Description=DolphinOS boot animation: line-art dolphin, no progress bar
+Description=DolphinOS boot animation: official dolphin logo, no progress bar
 ModuleName=two-step
 
 # DolphinOS 开机动画（Alpha 10 起改用 two-step 插件实现）
@@ -37,8 +37,12 @@ WatermarkHorizontalAlignment=.5
 WatermarkVerticalAlignment=.96
 Transition=none
 TransitionDuration=0.0
-BackgroundStartColor=0x0d63d9
-BackgroundEndColor=0x051430
+# 渐变终点色与桌面/向导/登录屏背景同为 #0f172a：开机动画淡出后正好
+# 落在会话的底色上，动画→向导（Live）/登录屏（装盘）衔接不闪断；
+# 起点色用官方标志的蓝 #1a5edb。向导与登录屏顶部都带同款官方海豚图，
+# 视觉上是同一段流程。
+BackgroundStartColor=0x1a5edb
+BackgroundEndColor=0x0f172a
 ProgressBarBackgroundColor=0x606060
 ProgressBarForegroundColor=0xffffff
 MessageBelowAnimation=true

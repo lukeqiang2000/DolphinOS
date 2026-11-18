@@ -38,7 +38,7 @@ fn refresh(
                     } else {
                         format_size(e.size).into()
                     },
-                    icon: if e.is_dir { "📁".into() } else { "📄".into() },
+                    icon: if e.is_dir { "▶".into() } else { "·".into() },
                 })
                 .collect();
             let count = list.len();

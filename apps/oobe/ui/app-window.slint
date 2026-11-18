@@ -1,7 +1,15 @@
 // DolphinOS 首次设置向导：顶部进度（第 x/8 步 + 步名）、中部按步切换内容、
 // 底部上一步/下一步（最后一步为完成）+ 校验提示。状态机在 wizard.rs。
+// Alpha 10：完成页在 Live 会话多出「安装完整版 / 暂不安装」；安装页可由
+// 完成页按钮或桌面「安装完整版」卡片（--install）直达。标题图标用实心
+// 海豚图（ui/dolphin.png），不再用字体里缺失的 emoji 字形。
 
-import { Button, LineEdit, CheckBox } from "std-widgets.slint";
+import { Button, LineEdit, CheckBox, ScrollView } from "std-widgets.slint";
+
+export struct InstallDisk {
+    value: string,
+    label: string,
+}
 
 export component AppWindow inherits Window {
     in-out property <int> step-index: 0;
@@ -18,9 +26,21 @@ export component AppWindow inherits Window {
     in-out property <string> selected-language: "zh-CN";
     in-out property <string> selected-biometric: "跳过";
     in-out property <string> selected-theme-name: "Dolphin";
-    in-out property <color> preview-bg: #0b0e11;
-    in-out property <color> preview-card: #1a2129;
-    in-out property <color> preview-accent: #1370f3;
+    in-out property <color> preview-bg: #0f172a;
+    in-out property <color> preview-card: #1e293b;
+    in-out property <color> preview-accent: #6366f1;
+    // 安装完整版（Alpha 10）
+    in property <bool> is-live: false;
+    in-out property <bool> show-install: false;
+    in property <[InstallDisk]> install-disks;
+    in-out property <string> install-disk: "";
+    in-out property <string> install-user: "";
+    in-out property <string> install-password: "";
+    in-out property <bool> install-confirm: false;
+    in-out property <string> install-log: "";
+    in-out property <bool> install-running: false;
+    in-out property <bool> install-done: false;
+    in-out property <bool> install-failed: false;
 
     callback next-step();
     callback back-step();
@@ -28,26 +48,39 @@ export component AppWindow inherits Window {
     callback select-language(string);
     callback select-theme(string);
     callback select-biometric(string);
+    callback open-install();
+    callback close-install();
+    callback start-install();
+    callback reboot-now();
+    callback finish-close();
 
     title: "DolphinOS 首次设置";
     preferred-width: 760px;
     preferred-height: 560px;
-    background: #0b0e11;
+    background: #0f172a;
 
     VerticalLayout {
         // 顶部进度
         Rectangle {
             height: 56px;
-            background: #10151b;
+            background: #131f38;
 
             HorizontalLayout {
                 padding-left: 20px;
                 padding-right: 20px;
                 spacing: 12px;
 
+                Image {
+                    source: @image-url("dolphin.png");
+                    width: 39px;
+                    height: 26px;
+                    image-fit: contain;
+                    y: 15px;
+                }
+
                 Text {
-                    text: "🐬 DolphinOS 设置向导";
-                    color: #e8eef4;
+                    text: "DolphinOS 设置向导";
+                    color: #f8fafc;
                     font-size: 16px;
                     vertical-alignment: center;
                 }
@@ -55,24 +88,124 @@ export component AppWindow inherits Window {
                 Rectangle {}
 
                 Text {
-                    text: root.progress-text + " · " + root.step-name;
-                    color: #8fa3b8;
+                    text: root.show-install ? "安装完整版" : root.progress-text + " · " + root.step-name;
+                    color: #94a3b8;
                     font-size: 13px;
                     vertical-alignment: center;
                 }
             }
         }
 
-        // 中部内容区（按步切换）
+        // 中部内容区（按步切换；安装模式时整体换成安装页）
         Rectangle {
-            background: #0b0e11;
+            background: #0f172a;
+
+            // ── 安装完整版页 ──
+            if root.show-install: VerticalLayout {
+                padding: 24px;
+                spacing: 10px;
+                Text { text: "安装 DolphinOS 到硬盘"; color: #f8fafc; font-size: 18px; font-weight: 600; }
+                Text {
+                    text: "选择目标磁盘并确认。注意：所选磁盘上的全部数据都会被清空，无法恢复。";
+                    color: #ffb454;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+                ScrollView {
+                    height: 108px;
+                    VerticalLayout {
+                        spacing: 4px;
+                        for disk in root.install-disks: Rectangle {
+                            height: 32px;
+                            border-radius: 8px;
+                            background: root.install-disk == disk.value ? #6366f1 : #1e293b;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                Text {
+                                    text: disk.label;
+                                    color: #f8fafc;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            TouchArea {
+                                enabled: !root.install-running;
+                                clicked => { root.install-disk = disk.value; }
+                            }
+                        }
+                        if root.install-disks.length == 0: Text {
+                            text: "没有检测到可用磁盘";
+                            color: #94a3b8;
+                            font-size: 12px;
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    LineEdit {
+                        text <=> root.install-user;
+                        placeholder-text: "装好后的用户名";
+                        enabled: !root.install-running;
+                    }
+                    LineEdit {
+                        text <=> root.install-password;
+                        placeholder-text: "该用户的密码（至少 4 位）";
+                        input-type: InputType.password;
+                        enabled: !root.install-running;
+                    }
+                }
+                CheckBox {
+                    text: "我知道所选磁盘上的所有数据都会被清除";
+                    checked <=> root.install-confirm;
+                    enabled: !root.install-running;
+                }
+                if root.install-log != "": Rectangle {
+                    height: 110px;
+                    border-radius: 8px;
+                    background: #0b1220;
+                    ScrollView {
+                        Text {
+                            text: root.install-log;
+                            color: #a9ccff;
+                            font-size: 11px;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button {
+                        text: "返回";
+                        enabled: !root.install-running;
+                        clicked => { root.close-install(); }
+                    }
+                    Rectangle {}
+                    if root.install-done: Button {
+                        text: "立即重启";
+                        primary: true;
+                        clicked => { root.reboot-now(); }
+                    }
+                    if !root.install-done: Button {
+                        text: root.install-running ? "安装中…" : "开始安装";
+                        primary: true;
+                        enabled: !root.install-running && root.install-disk != "" && root.install-confirm && root.install-user != "" && root.install-password.character-count >= 4;
+                        clicked => { root.start-install(); }
+                    }
+                    Button {
+                        text: "关闭";
+                        enabled: !root.install-running;
+                        clicked => { root.finish-close(); }
+                    }
+                }
+                Rectangle {}
+            }
 
             // 1 语言
-            if root.step-index == 0: VerticalLayout {
+            if !root.show-install && root.step-index == 0: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "选择界面语言"; color: #e8eef4; font-size: 18px; }
-                Text { text: "当前选择：" + root.selected-language; color: #8fa3b8; font-size: 12px; }
+                Text { text: "选择界面语言"; color: #f8fafc; font-size: 18px; }
+                Text { text: "当前选择：" + root.selected-language; color: #94a3b8; font-size: 12px; }
                 HorizontalLayout {
                     spacing: 10px;
                     Button { text: "简体中文"; clicked => { root.select-language("zh-CN"); } }
@@ -83,11 +216,11 @@ export component AppWindow inherits Window {
             }
 
             // 2 网络
-            if root.step-index == 1: VerticalLayout {
+            if !root.show-install && root.step-index == 1: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "连接网络"; color: #e8eef4; font-size: 18px; }
-                Text { text: "输入要连接的 Wi-Fi 名称，也可以跳过、稍后在设置里连接。"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                Text { text: "连接网络"; color: #f8fafc; font-size: 18px; }
+                Text { text: "输入要连接的 Wi-Fi 名称，也可以跳过、稍后在设置里连接。"; color: #94a3b8; font-size: 12px; wrap: word-wrap; }
                 LineEdit {
                     text <=> root.network-name;
                     placeholder-text: "Wi-Fi 名称（可空 = 跳过）";
@@ -96,10 +229,10 @@ export component AppWindow inherits Window {
             }
 
             // 3 账号
-            if root.step-index == 2: VerticalLayout {
+            if !root.show-install && root.step-index == 2: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "创建本机账号"; color: #e8eef4; font-size: 18px; }
+                Text { text: "创建本机账号"; color: #f8fafc; font-size: 18px; }
                 LineEdit {
                     text <=> root.account-name;
                     placeholder-text: "账号名（必填）";
@@ -113,11 +246,11 @@ export component AppWindow inherits Window {
             }
 
             // 4 指纹/人脸
-            if root.step-index == 3: VerticalLayout {
+            if !root.show-install && root.step-index == 3: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "指纹 / 人脸解锁"; color: #e8eef4; font-size: 18px; }
-                Text { text: "当前选择：" + root.selected-biometric + "（真正录入在登录后于系统设置完成，这里只记录意向）"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                Text { text: "指纹 / 人脸解锁"; color: #f8fafc; font-size: 18px; }
+                Text { text: "当前选择：" + root.selected-biometric + "（真正录入在登录后于系统设置完成，这里只记录意向）"; color: #94a3b8; font-size: 12px; wrap: word-wrap; }
                 HorizontalLayout {
                     spacing: 10px;
                     Button { text: "指纹"; clicked => { root.select-biometric("fingerprint"); } }
@@ -128,10 +261,10 @@ export component AppWindow inherits Window {
             }
 
             // 5 主题
-            if root.step-index == 4: VerticalLayout {
+            if !root.show-install && root.step-index == 4: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "选择主题"; color: #e8eef4; font-size: 18px; }
+                Text { text: "选择主题"; color: #f8fafc; font-size: 18px; }
                 HorizontalLayout {
                     spacing: 10px;
                     Button { text: "Dolphin"; clicked => { root.select-theme("Dolphin"); } }
@@ -149,7 +282,7 @@ export component AppWindow inherits Window {
                         Rectangle {
                             border-radius: 10px;
                             background: root.preview-card;
-                            Text { text: root.selected-theme-name; color: #e8eef4; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: root.selected-theme-name; color: #f8fafc; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                         }
                         Rectangle {
                             width: 90px;
@@ -163,11 +296,11 @@ export component AppWindow inherits Window {
             }
 
             // 6 隐私
-            if root.step-index == 5: VerticalLayout {
+            if !root.show-install && root.step-index == 5: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "隐私选项"; color: #e8eef4; font-size: 18px; }
-                Text { text: "两项默认关闭，开启后也随时可在设置里关掉。"; color: #8fa3b8; font-size: 12px; }
+                Text { text: "隐私选项"; color: #f8fafc; font-size: 18px; }
+                Text { text: "两项默认关闭，开启后也随时可在设置里关掉。"; color: #94a3b8; font-size: 12px; }
                 CheckBox {
                     text: "发送匿名使用统计";
                     checked <=> root.telemetry;
@@ -180,11 +313,11 @@ export component AppWindow inherits Window {
             }
 
             // 7 数据导入
-            if root.step-index == 6: VerticalLayout {
+            if !root.show-install && root.step-index == 6: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
-                Text { text: "导入已有数据"; color: #e8eef4; font-size: 18px; }
-                Text { text: "填写旧系统/备份的路径即可记录来源（实际拷贝后续进行），留空 = 跳过。"; color: #8fa3b8; font-size: 12px; wrap: word-wrap; }
+                Text { text: "导入已有数据"; color: #f8fafc; font-size: 18px; }
+                Text { text: "填写旧系统/备份的路径即可记录来源（实际拷贝后续进行），留空 = 跳过。"; color: #94a3b8; font-size: 12px; wrap: word-wrap; }
                 LineEdit {
                     text <=> root.import-path;
                     placeholder-text: "导入来源路径（可空 = 跳过）";
@@ -192,20 +325,50 @@ export component AppWindow inherits Window {
                 Rectangle {}
             }
 
-            // 8 完成
-            if root.step-index == 7: VerticalLayout {
+            // 8 完成（Live 会话多出安装入口，用户定案 UX）
+            if !root.show-install && root.step-index == 7: VerticalLayout {
                 padding: 28px;
                 spacing: 12px;
                 alignment: center;
-                Text { text: "🎉 设置完成"; color: #e8eef4; font-size: 22px; horizontal-alignment: center; }
-                Text { text: "设置已保存，欢迎使用 DolphinOS。"; color: #8fa3b8; font-size: 13px; horizontal-alignment: center; }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 10px;
+                    Image {
+                        source: @image-url("dolphin.png");
+                        width: 72px;
+                        height: 48px;
+                        image-fit: contain;
+                    }
+                    Text { text: "设置完成"; color: #f8fafc; font-size: 22px; font-weight: 600; vertical-alignment: center; }
+                }
+                Text { text: "设置已保存，欢迎使用 DolphinOS。"; color: #94a3b8; font-size: 13px; horizontal-alignment: center; }
+                if root.is-live: HorizontalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    Button {
+                        text: "安装完整版";
+                        primary: true;
+                        clicked => { root.open-install(); }
+                    }
+                    Button {
+                        text: "暂不安装";
+                        clicked => { root.finish-close(); }
+                    }
+                }
+                if !root.is-live: HorizontalLayout {
+                    alignment: center;
+                    Button {
+                        text: "关闭";
+                        clicked => { root.finish-close(); }
+                    }
+                }
             }
         }
 
-        // 底部导航
+        // 底部导航（安装模式时隐藏，用安装页自己的按钮）
         Rectangle {
             height: 64px;
-            background: #10151b;
+            background: #131f38;
 
             HorizontalLayout {
                 padding: 14px;
@@ -220,19 +383,19 @@ export component AppWindow inherits Window {
 
                 Rectangle {}
 
-                Button {
+                if !root.show-install: Button {
                     text: "上一步";
                     enabled: root.can-go-back;
                     clicked => { root.back-step(); }
                 }
 
-                if root.step-index < 6: Button {
+                if !root.show-install && root.step-index < 6: Button {
                     text: "下一步";
                     primary: true;
                     clicked => { root.next-step(); }
                 }
 
-                if root.step-index == 6: Button {
+                if !root.show-install && root.step-index == 6: Button {
                     text: "完成";
                     primary: true;
                     clicked => { root.finish(); }

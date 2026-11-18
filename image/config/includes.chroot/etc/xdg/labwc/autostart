@@ -11,3 +11,8 @@ swaybg -c '#0b5bcb' >/dev/null 2>&1 &
 /usr/local/bin/dolphin-shell-launcher &
 # 3) 心跳：autostart 跑完写就绪标记，tty 里可查。
 date '+%Y-%m-%d %H:%M:%S autostart done' > /tmp/dolphin-desktop-ready
+# 4) 首次设置向导（Alpha 10）：还没完成过向导就自动弹出。Live 的主目录
+#    不落盘、每次开机都会弹（正合「Live 启动后自动弹导向」的定案）；
+#    装盘系统只在新用户第一次登录时弹，向导完成写入 oobe_done 后
+#    --autostart 自行静默退出、不再打扰。
+dolphin-oobe --autostart >/dev/null 2>&1 &

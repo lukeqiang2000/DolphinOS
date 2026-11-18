@@ -1,0 +1,252 @@
+#!/bin/sh
+# DolphinOS 安装引擎：把当前 Live 系统装到一块目标磁盘（整盘安装）。
+#
+# 两种驱动方式（同一套逻辑）：
+#   1. 图形界面：首次设置向导的安装页以 root 子进程调用本脚本，
+#      参数全部经环境变量传入，进度从标准输出逐行读回界面；
+#   2. 非交互测试：QEMU 自动化验证同样经环境变量驱动，无人值守跑完。
+#
+# 环境变量：
+#   DOLPHIN_INSTALL_DISK     目标磁盘（必填，如 /dev/sda、/dev/vdb、
+#                            /dev/nvme0n1）；整盘会被清空，无任何保留。
+#   DOLPHIN_INSTALL_USER     装好后创建的正式用户名（默认 user）。
+#   DOLPHIN_INSTALL_PASSWORD 上述用户的密码（必填，不落任何日志）。
+#   DOLPHIN_INSTALL_HOSTNAME 主机名（默认 dolphinos）。
+#   DOLPHIN_INSTALL_YES=1    跳过终端确认（界面已做过二次确认时用）。
+#
+# 流程：固件判定（UEFI/BIOS）→ 分区（UEFI: ESP+根；BIOS: 根+MBR）
+# → 格式化 → rsync 复制 Live 根文件系统（排除 Live 专用件与运行时
+# 目录）→ 目标内清理（卸 live 包、重建 initramfs、去自动登录、
+# 清 machine-id）→ 写 fstab（UUID）→ grub-install + update-grub
+# → 建正式用户 → 卸载收尾。
+# 安全：拒绝把系统装到 Live 介质所在的磁盘上（会毁掉正在运行的源）。
+
+set -eu
+
+# 可选的配置文件入参：$1 为 KEY=VALUE 文件（每行一个 DOLPHIN_INSTALL_*）。
+# 图形界面经 sudo 调用时环境变量会被 sudo 的 env_reset 过滤掉，故界面
+# 改走配置文件（写在运行时目录、权限 600）；非交互测试仍可直接用环境
+# 变量。文件里只认白名单键、逐行赋值不用 eval，密码只经 stdin 喂给
+# chpasswd，不进任何日志。
+if [ -n "${1:-}" ] && [ -f "$1" ]; then
+    while IFS='=' read -r CFG_KEY CFG_VALUE || [ -n "$CFG_KEY" ]; do
+        case "$CFG_KEY" in
+            DOLPHIN_INSTALL_DISK) DISK_FROM_FILE="$CFG_VALUE" ;;
+            DOLPHIN_INSTALL_USER) USER_FROM_FILE="$CFG_VALUE" ;;
+            DOLPHIN_INSTALL_PASSWORD) PASS_FROM_FILE="$CFG_VALUE" ;;
+            DOLPHIN_INSTALL_HOSTNAME) HOST_FROM_FILE="$CFG_VALUE" ;;
+            DOLPHIN_INSTALL_YES) YES_FROM_FILE="$CFG_VALUE" ;;
+        esac
+    done < "$1"
+    DOLPHIN_INSTALL_DISK="${DISK_FROM_FILE-${DOLPHIN_INSTALL_DISK:-}}"
+    DOLPHIN_INSTALL_USER="${USER_FROM_FILE-${DOLPHIN_INSTALL_USER:-}}"
+    DOLPHIN_INSTALL_PASSWORD="${PASS_FROM_FILE-${DOLPHIN_INSTALL_PASSWORD:-}}"
+    DOLPHIN_INSTALL_HOSTNAME="${HOST_FROM_FILE-${DOLPHIN_INSTALL_HOSTNAME:-}}"
+    DOLPHIN_INSTALL_YES="${YES_FROM_FILE-${DOLPHIN_INSTALL_YES:-}}"
+fi
+
+DISK="${DOLPHIN_INSTALL_DISK:-}"
+NEWUSER="${DOLPHIN_INSTALL_USER:-user}"
+NEWPASS="${DOLPHIN_INSTALL_PASSWORD:-}"
+HOSTNAME_NEW="${DOLPHIN_INSTALL_HOSTNAME:-dolphinos}"
+TARGET=/mnt/dolphin-target
+
+say() { echo "[dolphin-install] $*"; }
+die() { echo "[dolphin-install] 错误: $*" >&2; exit 1; }
+
+# --list-disks：给界面/人工看的磁盘清单（设备 大小 型号）
+if [ "${1:-}" = "--list-disks" ]; then
+    for b in /sys/block/*; do
+        name=${b##*/}
+        case "$name" in loop*|ram*|sr*|dm-*) continue ;; esac
+        sectors=$(cat "$b/size" 2>/dev/null || echo 0)
+        model=$(cat "$b/device/model" 2>/dev/null || echo "")
+        echo "/dev/$name $((sectors * 512 / 1024 / 1024)) MiB $model"
+    done
+    exit 0
+fi
+
+[ "$(id -u)" = "0" ] || die "必须以 root 运行"
+[ -n "$DISK" ] || die "未指定目标磁盘 DOLPHIN_INSTALL_DISK"
+[ -b "$DISK" ] || die "目标 $DISK 不是块设备"
+[ -n "$NEWPASS" ] || die "未提供新用户密码 DOLPHIN_INSTALL_PASSWORD"
+case "$NEWUSER" in
+    ''|*[!a-z0-9_-]*|[0-9]*) die "用户名不合法: $NEWUSER" ;;
+esac
+
+# Live 介质保护：介质挂载点的源设备所属整盘不许作为目标。
+MEDIUM_SRC=$(findmnt -no SOURCE /lib/live/mount/medium 2>/dev/null || true)
+if [ -n "$MEDIUM_SRC" ]; then
+    SRC_DISK="$MEDIUM_SRC"
+    while [ -n "$SRC_DISK" ] && [ "$SRC_DISK" != "$DISK" ]; do
+        PK=$(lsblk -no PKNAME "$SRC_DISK" 2>/dev/null | head -1)
+        [ -n "$PK" ] || break
+        SRC_DISK="/dev/$PK"
+    done
+    [ "$SRC_DISK" = "$DISK" ] && die "目标磁盘就是 Live 介质本身，拒绝安装"
+fi
+
+if [ "${DOLPHIN_INSTALL_YES:-}" != "1" ]; then
+    echo "警告：$DISK 上的全部数据将被清空并安装 DolphinOS。"
+    printf "确认继续请输入 YES 并回车: "
+    read -r ANSWER < /dev/tty || die "无法读取确认输入"
+    [ "$ANSWER" = "YES" ] || die "用户取消"
+fi
+
+if [ -d /sys/firmware/efi ]; then
+    FIRMWARE=uefi
+else
+    FIRMWARE=bios
+fi
+say "固件类型: $FIRMWARE；目标磁盘: $DISK；新用户: $NEWUSER"
+
+part_dev() {
+    # /dev/sda→/dev/sda1；/dev/nvme0n1→/dev/nvme0n1p1；/dev/mmcblk0→p1
+    case "$1" in
+        *[0-9]) echo "$1p$2" ;;
+        *) echo "$1$2" ;;
+    esac
+}
+
+cleanup_mounts() {
+    umount "$TARGET/boot/efi" 2>/dev/null || true
+    umount "$TARGET/dev" 2>/dev/null || true
+    umount "$TARGET/proc" 2>/dev/null || true
+    umount "$TARGET/sys" 2>/dev/null || true
+    umount "$TARGET" 2>/dev/null || true
+}
+trap cleanup_mounts EXIT
+
+# 目标盘上如有已挂载分区先卸下
+for p in $(lsblk -no MOUNTPOINT "$DISK" 2>/dev/null | grep -v '^$' || true); do
+    umount "$p" 2>/dev/null || true
+done
+
+say "正在分区（整盘清空）…"
+if [ "$FIRMWARE" = "uefi" ]; then
+    P_ESP=$(part_dev "$DISK" 1)
+    P_ROOT=$(part_dev "$DISK" 2)
+    sfdisk --wipe always --wipe-partitions always "$DISK" <<EOF
+label: gpt
+unit: sectors
+first-lba: 2048
+$P_ESP: start=2048, size=1048576, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="ESP"
+$P_ROOT: start=1050624, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="DolphinOS"
+EOF
+else
+    P_ROOT=$(part_dev "$DISK" 1)
+    sfdisk --wipe always --wipe-partitions always "$DISK" <<EOF
+label: dos
+unit: sectors
+$P_ROOT: start=2048, type=83, bootable
+EOF
+fi
+partprobe "$DISK" 2>/dev/null || true
+udevadm settle 2>/dev/null || sleep 2
+
+say "正在格式化…"
+if [ "$FIRMWARE" = "uefi" ]; then
+    mkfs.vfat -F 32 -n ESP "$P_ESP" >/dev/null
+fi
+mkfs.ext4 -F -L DolphinOS "$P_ROOT" >/dev/null
+
+mkdir -p "$TARGET"
+mount "$P_ROOT" "$TARGET"
+if [ "$FIRMWARE" = "uefi" ]; then
+    mkdir -p "$TARGET/boot/efi"
+    mount "$P_ESP" "$TARGET/boot/efi"
+fi
+
+say "正在复制系统文件（这一步最久，请勿中断）…"
+rsync -aAX \
+    --exclude='/dev/*' --exclude='/proc/*' --exclude='/sys/*' \
+    --exclude='/run/*' --exclude='/tmp/*' --exclude='/mnt/*' \
+    --exclude='/media/*' --exclude='/lib/live/mount/*' \
+    --exclude='/var/tmp/*' \
+    / "$TARGET"/
+
+say "正在清理 Live 专用件并写入装盘配置…"
+rm -rf "$TARGET/etc/live" "$TARGET/lib/live"
+: > "$TARGET/etc/machine-id"
+rm -f "$TARGET/var/lib/dbus/machine-id"
+echo "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
+
+# greetd：装盘系统只留密码登录（去掉 Live 的 initial_session 自动登录）
+cat > "$TARGET/etc/greetd/config.toml" <<'EOF'
+# greetd 配置（装盘系统，由 dolphin-install 写入）：只有密码登录，
+# 没有 Live 的自动登录节。会话命令与 Live 版保持一致。
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/local/bin/dolphin-greeter-session"
+user = "_greetd"
+EOF
+
+# GRUB 默认项：装盘后同样不显示菜单、直接启动；关 os-prober 防报错；
+# 主题素材在位时挂上与 Live 相同的海豚主题。
+GRUB_DEFAULTS="$TARGET/etc/default/grub"
+if [ -f "$GRUB_DEFAULTS" ]; then
+    sed -i \
+        -e 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' \
+        -e 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' \
+        -e 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' \
+        "$GRUB_DEFAULTS"
+    grep -q '^GRUB_TIMEOUT=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT=0' >> "$GRUB_DEFAULTS"
+    grep -q '^GRUB_TIMEOUT_STYLE=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT_STYLE=hidden' >> "$GRUB_DEFAULTS"
+    grep -q '^GRUB_DISABLE_OS_PROBER=' "$GRUB_DEFAULTS" || echo 'GRUB_DISABLE_OS_PROBER=true' >> "$GRUB_DEFAULTS"
+fi
+MEDIUM_GRUB=/lib/live/mount/medium/boot/grub
+if [ -d "$MEDIUM_GRUB/live-theme" ]; then
+    mkdir -p "$TARGET/boot/grub"
+    cp -r "$MEDIUM_GRUB/live-theme" "$TARGET/boot/grub/" 2>/dev/null || true
+    cp "$MEDIUM_GRUB/splash.png" "$TARGET/boot/grub/" 2>/dev/null || true
+    cp "$MEDIUM_GRUB/theme.cfg" "$TARGET/boot/grub/" 2>/dev/null || true
+    if [ -f "$GRUB_DEFAULTS" ]; then
+        sed -i 's|^GRUB_THEME=.*|GRUB_THEME=/boot/grub/live-theme/theme.txt|' "$GRUB_DEFAULTS"
+        grep -q '^GRUB_THEME=' "$GRUB_DEFAULTS" || echo 'GRUB_THEME=/boot/grub/live-theme/theme.txt' >> "$GRUB_DEFAULTS"
+    fi
+fi
+
+ROOT_UUID=$(blkid -s UUID -o value "$P_ROOT")
+{
+    echo "# DolphinOS 装盘 fstab（dolphin-install 生成，按 UUID 挂载）"
+    echo "UUID=$ROOT_UUID / ext4 defaults 0 1"
+    if [ "$FIRMWARE" = "uefi" ]; then
+        ESP_UUID=$(blkid -s UUID -o value "$P_ESP")
+        echo "UUID=$ESP_UUID /boot/efi vfat umask=0077 0 1"
+    fi
+} > "$TARGET/etc/fstab"
+
+# 进目标系统收尾：卸 Live 包、重建 initramfs、装引导、建用户。
+mount --bind /dev "$TARGET/dev"
+mount -t proc proc "$TARGET/proc"
+mount --bind /sys "$TARGET/sys"
+run_in_target() {
+    chroot "$TARGET" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/root "$@"
+}
+
+say "正在移除 Live 组件并重建 initramfs…"
+run_in_target apt-get purge -y live-boot live-config live-tools >/dev/null 2>&1 || true
+run_in_target update-initramfs -u >/dev/null
+
+say "正在安装引导程序…"
+if [ "$FIRMWARE" = "uefi" ]; then
+    # --removable：同时写入 ESP 的 fallback 路径 EFI/BOOT/BOOTX64.EFI，
+    # 不依赖 NVRAM 启动项（虚拟机与换盘场景都能直接启动）。
+    run_in_target grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=DolphinOS --removable
+else
+    run_in_target grub-install --target=i386-pc "$DISK"
+fi
+run_in_target update-grub
+
+say "正在创建正式用户 $NEWUSER…"
+run_in_target userdel -r user >/dev/null 2>&1 || true
+run_in_target useradd -m -s /bin/bash -G sudo,adm,cdrom,plugdev,users "$NEWUSER"
+echo "$NEWUSER:$NEWPASS" | run_in_target chpasswd
+
+sync
+trap - EXIT
+cleanup_mounts
+say "安装完成：可以重启并拔掉 Live 介质，从硬盘启动。"

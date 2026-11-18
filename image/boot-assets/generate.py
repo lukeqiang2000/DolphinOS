@@ -1,112 +1,92 @@
 #!/usr/bin/env python3
 # DolphinOS 开机体验素材生成器
 #
-# 用同一套海豚轮廓控制点（Catmull-Rom 样条采样）生成三处素材，保证
-# GRUB 菜单背景、GRUB 选中框与 Plymouth 开机动画里的海豚长得一致：
+# Alpha 10 起，海豚标志统一使用用户提供的官方版本
+# （仓库根 assets/dolphin-logo.svg，用户 2026-11-18 提供、令全系统
+# 换用）。硬规则：海豚本体的路径/比例/配色一律原样，只许等比缩放与
+# 栅格化；官方 SVG 仅去掉了一层独立的白色背景 rect（让背景透明），
+# 本体零改动。本生成器只做：栅格化、整图平移/合成、以及在海豚之外
+# 添加水花/文字等独立元素，绝不重绘海豚本体。
+#
+# 产出：
 #   1. image/config/bootloaders/splash.svg
-#      —— live-build 的 binary_bootloader_splash 会把它转成 800x600 的
-#         boot/grub/splash.png（GRUB 背景图；若将来切回 syslinux 则转
-#         640x480 的 isolinux/splash.png，同一文件复用）。
+#      —— GRUB 菜单背景：品牌蓝渐变 + 内嵌官方标志栅格图（data URI）
+#         + DolphinOS/ALPHA 字样；live-build 转 800x600 splash.png。
 #   2. image/config/bootloaders/grub-pc/live-theme/select_*.png
-#      —— GRUB 主题里选中项的九宫格切片（Dolphin 蓝圆角条）。
+#      —— GRUB 主题选中项九宫格切片（Dolphin 蓝圆角条，与海豚无关）。
 #   3. image/config/includes.chroot/usr/share/plymouth/themes/dolphin/
 #      animation-XXXX.png 与 throbber-XXXX.png（同一批帧、两组名字）
-#      —— Plymouth two-step 主题的 12 帧游动动画（透明底，背景渐变由
-#         主题的 BackgroundStart/EndColor 画）。Alpha 10 起改用
-#         two-step：script 插件在 plymouth 26.134.222 里必崩，见
-#         ALPHA10-REPORT.md。
-#
-# 标志造型（Alpha 9 重做，用户原话「图标太丑」）：
-# 旧版是细线稿海豚（仅描边 + 10% 透明填充），在深蓝底上显得单薄。
-# 新版改为实心海豚：身体纵向渐变（浅顶 → 深腹）、白色腹斑、深色描边
-# 定形、实心胸鳍、深色眼睛带高光点、嘴线，是一枚正经的标志而非线稿。
+#      —— Plymouth two-step 主题 12 帧：官方海豚沿跃起弧线上下运动
+#         （整图平移，本体零改动），低点时下方水花环扩散；无加载条。
+#         script 插件在 plymouth 26.134.222 里必崩（见 ALPHA10-REPORT.md），
+#         故动画走 two-step 的帧序列实现。
+#   4. apps/{shell,greeter,oobe}/ui/dolphin.png
+#      —— 三个自研应用的品牌图（顶栏海豚按钮/登录屏/向导），512px 宽。
 #
 # 重新生成：python3 image/boot-assets/generate.py
-# 依赖：Pillow（PIL）与 DejaVu Sans 字体（构建机/开发机标配）。
+# 依赖：Pillow、cairosvg（或 rsvg-convert）与 DejaVu Sans 字体。
 
+import base64
+import io
 import math
 import os
+import subprocess
+import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IMAGE_DIR = os.path.dirname(HERE)  # .../image
+REPO_DIR = os.path.dirname(IMAGE_DIR)  # 仓库根
+LOGO_SVG = os.path.join(REPO_DIR, "assets", "dolphin-logo.svg")
 SPLASH_SVG = os.path.join(IMAGE_DIR, "config", "bootloaders", "splash.svg")
 GRUB_THEME_DIR = os.path.join(IMAGE_DIR, "config", "bootloaders", "grub-pc", "live-theme")
 PLYMOUTH_DIR = os.path.join(
     IMAGE_DIR, "config", "includes.chroot", "usr", "share", "plymouth", "themes", "dolphin"
 )
+APP_UI_DIRS = [
+    os.path.join(REPO_DIR, "apps", app, "ui") for app in ("shell", "greeter", "oobe")
+]
 
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-# ---------------------------------------------------------------------------
-# 海豚轮廓：局部坐标（1000x700，朝左），闭合控制点列，经 Catmull-Rom 采样。
-# 顺序：吻尖 → 额隆 → 头顶 → 背 → 背鳍 → 背后段 → 尾柄 → 尾鳍上叶 →
-#       尾鳍缺口 → 尾鳍下叶 → 尾柄下 → 腹 → 喉 → 颌下 → 吻下。
-# ---------------------------------------------------------------------------
-OUTLINE = [
-    (60, 382), (120, 338), (185, 300), (275, 268), (400, 240),
-    (505, 232), (548, 205), (575, 160), (592, 215), (615, 242),
-    (730, 262), (838, 292), (905, 262), (978, 208), (940, 302),
-    (972, 392), (880, 348), (760, 382), (600, 408), (430, 420),
-    (300, 410), (168, 402), (84, 396),
-]
-# 胸鳍（独立折线）与嘴线（独立折线）、眼睛（圆心，局部坐标）
-FIN = [(418, 402), (452, 466), (494, 486), (472, 410)]
-MOUTH = [(76, 388), (150, 382), (208, 378)]
-EYE = (214, 330)
-
-LINE = (220, 238, 255)        # 线稿近白蓝（旧版用，现仅作备用常量）
 TITLE = (255, 255, 255)
 SUBTITLE = (169, 204, 255)
-ACCENT = (19, 112, 243)       # Dolphin 蓝 #1370f3
-# Alpha 9 实心标志配色（深蓝底上的浅色海豚）
-BODY_TOP = (234, 244, 255)    # 身体渐变顶 #eaf4ff
-BODY_MID = (185, 217, 255)    # 身体渐变中 #b9d9ff
-BODY_BOTTOM = (127, 178, 245) # 身体渐变底 #7fb2f5
-BODY_EDGE = (28, 79, 158)     # 描边/嘴线 #1c4f9e
-FIN_FILL = (143, 189, 247)    # 胸鳍 #8fbdf7
-EYE_FILL = (18, 58, 107)      # 眼睛 #123a6b
+ACCENT = (19, 112, 243)  # Dolphin 蓝 #1370f3
+SPLASH_RING = (168, 208, 255)  # 水花浅蓝
 
 
-def sample_closed(points, steps=16):
-    """闭合 Catmull-Rom 样条采样，返回平滑点列。"""
-    n = len(points)
-    out = []
-    for i in range(n):
-        p0 = points[(i - 1) % n]
-        p1 = points[i]
-        p2 = points[(i + 1) % n]
-        p3 = points[(i + 2) % n]
-        for s in range(steps):
-            t = s / steps
-            t2, t3 = t * t, t * t * t
-            x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t
-                       + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
-                       + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
-            y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t
-                       + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
-                       + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
-            out.append((x, y))
-    return out
+def load_logo_png(width):
+    """把官方标志 SVG 栅格化为指定宽度的透明 PNG（等比缩放，本体零改动）。"""
+    try:
+        import cairosvg
 
-
-def svg_path(points, close=True):
-    d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in points)
-    return d + (" Z" if close else "")
+        data = cairosvg.svg2png(url=LOGO_SVG, output_width=width)
+        return Image.open(io.BytesIO(data)).convert("RGBA")
+    except ImportError:
+        pass
+    # 退路：rsvg-convert
+    proc = subprocess.run(
+        ["rsvg-convert", "-w", str(width), LOGO_SVG],
+        capture_output=True, check=True,
+    )
+    return Image.open(io.BytesIO(proc.stdout)).convert("RGBA")
 
 
 # ---------------------------------------------------------------------------
 # 1) GRUB / syslinux 共用 splash.svg（800x600 画布）
 # ---------------------------------------------------------------------------
 def write_splash_svg():
-    outline = sample_closed(OUTLINE)
-    fin = sample_closed(FIN, steps=10)  # 胸鳍：闭合样条多边形，实心填充
+    logo = load_logo_png(400)
+    buf = io.BytesIO()
+    logo.save(buf, format="PNG", optimize=True)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     svg = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!-- DolphinOS 引导菜单背景（live-build 自动转 PNG：GRUB 800x600 / syslinux 640x480）
-     由 image/boot-assets/generate.py 生成，请勿手改本文件，改生成器后重跑。 -->
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+     由 image/boot-assets/generate.py 生成，请勿手改本文件，改生成器后重跑。
+     海豚为用户提供的官方标志（assets/dolphin-logo.svg）栅格化内嵌，本体零改动。 -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800" height="600" viewBox="0 0 800 600">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#0d63d8"/>
@@ -117,37 +97,18 @@ def write_splash_svg():
       <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#eaf4ff"/>
-      <stop offset="0.45" stop-color="#b9d9ff"/>
-      <stop offset="1" stop-color="#7fb2f5"/>
-    </linearGradient>
-    <clipPath id="bodyclip">
-      <path d="{svg_path(outline)}"/>
-    </clipPath>
   </defs>
   <rect width="800" height="600" fill="url(#bg)"/>
-  <ellipse cx="400" cy="150" rx="330" ry="150" fill="url(#glow)"/>
-  <g transform="translate(192,21) scale(0.40)">
-    <path d="{svg_path(outline)}" fill="url(#body)"
-          stroke="#1c4f9e" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
-    <ellipse cx="500" cy="435" rx="390" ry="60" fill="#ffffff" fill-opacity="0.5"
-             clip-path="url(#bodyclip)"/>
-    <path d="{svg_path(fin)}" fill="#8fbdf7"
-          stroke="#1c4f9e" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="{svg_path(MOUTH, close=False)}" fill="none"
-          stroke="#1c4f9e" stroke-width="6" stroke-linecap="round"/>
-    <circle cx="{EYE[0]}" cy="{EYE[1]}" r="14" fill="#123a6b"/>
-    <circle cx="{EYE[0]-4}" cy="{EYE[1]-4}" r="4.5" fill="#ffffff"/>
-  </g>
-  <path d="M250 232 C300 218 340 246 390 232 S480 218 530 232" fill="none"
-        stroke="#7db4ff" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round"/>
-  <path d="M300 252 C335 242 365 262 400 252 S465 242 500 252" fill="none"
-        stroke="#7db4ff" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round"/>
-  <text x="400" y="296" text-anchor="middle" font-family="DejaVu Sans"
+  <ellipse cx="400" cy="165" rx="330" ry="170" fill="url(#glow)"/>
+  <image x="200" y="30" width="400" height="267" xlink:href="data:image/png;base64,{b64}"/>
+  <text x="400" y="356" text-anchor="middle" font-family="DejaVu Sans"
         font-weight="bold" font-size="44" letter-spacing="1" fill="#ffffff">DolphinOS</text>
-  <text x="400" y="326" text-anchor="middle" font-family="DejaVu Sans"
+  <text x="400" y="388" text-anchor="middle" font-family="DejaVu Sans"
         font-size="17" letter-spacing="6" fill="#a9ccff">ALPHA</text>
+  <path d="M250 522 C300 508 340 536 390 522 S480 508 530 522" fill="none"
+        stroke="#7db4ff" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round"/>
+  <path d="M300 545 C335 535 365 555 400 545 S465 535 500 545" fill="none"
+        stroke="#7db4ff" stroke-opacity="0.25" stroke-width="3" stroke-linecap="round"/>
 </svg>
 """
     os.makedirs(os.path.dirname(SPLASH_SVG), exist_ok=True)
@@ -176,83 +137,46 @@ def write_select_pixmaps():
 
 # ---------------------------------------------------------------------------
 # 3) Plymouth 动画帧（1024x640 透明底，12 帧循环）
+#    官方海豚整图沿跃起弧线平移（本体零改动）；低点时下方水花环扩散、
+#    水滴扬起（独立元素）。two-step 主题把帧居中显示在品牌蓝渐变上。
 # ---------------------------------------------------------------------------
-def _vertical_gradient(size, top, mid, bottom):
-    """纵向三段渐变（Pillow 实现）：返回与 size 同尺寸的 RGBA 渐变图。"""
-    w, h = size
-    grad = Image.new("RGBA", (1, h))
-    px = grad.load()
-    for y in range(h):
-        t = y / max(1, h - 1)
-        if t < 0.45:
-            a, b, f = top, mid, t / 0.45
-        else:
-            a, b, f = mid, bottom, (t - 0.45) / 0.55
-        px[0, y] = tuple(int(a[i] + (b[i] - a[i]) * f) for i in range(3)) + (255,)
-    return grad.resize((w, h))
-
-
-def draw_dolphin_layer(scale, ox, oy):
-    """在独立透明层上画实心海豚（局部坐标 → 屏幕坐标），与 splash.svg 同款造型。"""
-    layer = Image.new("RGBA", (1024, 640), (0, 0, 0, 0))
-
-    def tx(points):
-        return [(ox + x * scale, oy + y * scale) for x, y in points]
-
-    # 身体：渐变填充（以轮廓多边形作 mask 贴渐变）
-    mask = Image.new("L", (1024, 640), 0)
-    md = ImageDraw.Draw(mask)
-    md.polygon(tx(sample_closed(OUTLINE)), fill=255)
-    grad = _vertical_gradient((1024, 640), BODY_TOP, BODY_MID, BODY_BOTTOM)
-    layer.paste(grad, (0, 0), mask)
-    d = ImageDraw.Draw(layer)
-    # 腹斑：白色椭圆（同样以轮廓 mask 裁剪，只留体内部分）
-    belly = Image.new("RGBA", (1024, 640), (0, 0, 0, 0))
-    bd = ImageDraw.Draw(belly)
-    bx, by = ox + 500 * scale, oy + 435 * scale
-    brx, bry = 390 * scale, 60 * scale
-    bd.ellipse([bx - brx, by - bry, bx + brx, by + bry], fill=(255, 255, 255, 128))
-    belly.putalpha(Image.composite(belly.split()[3], Image.new("L", (1024, 640), 0), mask))
-    layer.alpha_composite(belly)
-    # 轮廓描边 + 胸鳍（实心）+ 嘴线 + 眼睛
-    d.line(tx(sample_closed(OUTLINE)), fill=BODY_EDGE + (255,), width=4, joint="curve")
-    d.polygon(tx(sample_closed(FIN, steps=10)), fill=FIN_FILL + (255,))
-    d.line(tx(sample_closed(FIN, steps=10)), fill=BODY_EDGE + (255,), width=3, joint="curve")
-    d.line(tx(MOUTH), fill=BODY_EDGE + (255,), width=4, joint="curve")
-    ex, ey = ox + EYE[0] * scale, oy + EYE[1] * scale
-    r = 11
-    d.ellipse([ex - r, ey - r, ex + r, ey + r], fill=EYE_FILL + (255,))
-    d.ellipse([ex - 7, ey - 7, ex + 1, ey + 1], fill=(255, 255, 255, 255))
-    return layer
-
-
 def write_frames(count=12):
     os.makedirs(PLYMOUTH_DIR, exist_ok=True)
-    scale, ox, oy = 0.80, 97, 42
-    layer0 = draw_dolphin_layer(scale, ox, oy)
+    logo = load_logo_png(620)  # 620x413
     title_font = ImageFont.truetype(FONT_BOLD, 58)
     sub_font = ImageFont.truetype(FONT_REGULAR, 25)
+    cx = 512
+    base_cy = 262  # 海豚中心基准高度
+    water_y = 486  # 水面线（水花环中心）
     for i in range(count):
         phase = 2 * math.pi * i / count
-        dx = round(24 * math.sin(phase))
-        dy = round(9 * math.sin(phase + 0.9))
-        angle = 2.2 * math.sin(phase)
-        layer = layer0.rotate(angle, resample=Image.BICUBIC, center=(512, 300))
+        # 跃起弧线：i=3 最高（dy=-30），i=9 最低（dy=+30）
+        dy = round(-30 * math.sin(phase))
+        cy = base_cy + dy
+        low = (dy + 30) / 60.0  # 0=最高点，1=最低点
         frame = Image.new("RGBA", (1024, 640), (0, 0, 0, 0))
-        frame.alpha_composite(layer, (dx, dy))
         d = ImageDraw.Draw(frame)
-        # 气泡：从吻部附近升起、渐隐
-        for j in range(4):
-            p = (i * 11 + j * 29) % 110
-            bx = 185 + j * 30 + 6 * math.sin(i * 0.7 + j)
-            by = 305 - p
-            r = 4 + (j % 3) * 2
-            alpha = max(30, int(210 - p * 1.7))
-            d.ellipse([bx - r, by - r, bx + r, by + r],
-                      outline=(180, 215, 255, alpha), width=2)
-        d.text((512, 522), "DolphinOS", font=title_font, anchor="mm",
+        # 水花：椭圆环（低点时更宽更亮）+ 两侧水滴（低点时扬得更高）
+        rx = 150 + 95 * low
+        ry = 13 + 7 * low
+        alpha = int(70 + 150 * low)
+        d.ellipse([cx - rx, water_y - ry, cx + rx, water_y + ry],
+                  outline=SPLASH_RING + (alpha,), width=3)
+        rx2 = rx * 0.62
+        d.ellipse([cx - rx2, water_y - ry * 0.6, cx + rx2, water_y + ry * 0.6],
+                  outline=SPLASH_RING + (max(30, alpha - 70),), width=2)
+        for k, off in enumerate((-150, -95, 95, 150)):
+            lift = (8 + 22 * low) * (1.0 if k % 2 == 0 else 0.7)
+            r = 4.5 - (k % 2)
+            dxp = off * (0.8 + 0.35 * low)
+            d.ellipse([cx + dxp - r, water_y - lift - r, cx + dxp + r, water_y - lift + r],
+                      fill=SPLASH_RING + (alpha,))
+        # 海豚本体：整图平移贴入，像素零改动
+        frame.alpha_composite(logo, (cx - logo.width // 2, cy - logo.height // 2))
+        d = ImageDraw.Draw(frame)
+        d.text((512, 540), "DolphinOS", font=title_font, anchor="mm",
                fill=TITLE + (235,))
-        d.text((512, 580), "A L P H A", font=sub_font, anchor="mm",
+        d.text((512, 592), "A L P H A", font=sub_font, anchor="mm",
                fill=SUBTITLE + (225,))
         # two-step 主题按 animation-%04d / throbber-%04d 两组名字取帧，
         # 同一批帧写两份（序号从 1 起）。
@@ -262,7 +186,21 @@ def write_frames(count=12):
             print(f"{prefix}-{i + 1:04d}.png:", os.path.getsize(path), "bytes")
 
 
+# ---------------------------------------------------------------------------
+# 4) 自研应用品牌图（Shell 顶栏按钮 / 登录屏 / 向导），512px 宽透明底
+# ---------------------------------------------------------------------------
+def write_app_logos():
+    logo = load_logo_png(512)
+    for ui_dir in APP_UI_DIRS:
+        path = os.path.join(ui_dir, "dolphin.png")
+        logo.save(path, optimize=True)
+        print("app logo:", path, os.path.getsize(path), "bytes")
+
+
 if __name__ == "__main__":
+    if not os.path.exists(LOGO_SVG):
+        sys.exit(f"official logo not found: {LOGO_SVG}")
     write_splash_svg()
     write_select_pixmaps()
     write_frames()
+    write_app_logos()

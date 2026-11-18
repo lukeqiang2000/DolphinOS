@@ -52,6 +52,39 @@ pipewire
 wireplumber
 xdg-desktop-portal-wlr
 
+# 应用商店（Alpha 10 用户改定）：Bazaar（Kolunmi 的 Flatpak 商店，
+# sid 有现成包，依赖自动带入 flatpak）；Flathub 系统源由
+# 0110-bazaar-flathub.hook.chroot 预置。原定 GNOME Software 从未
+# 真正进过包列表（Shell 卡片指向的是不存在的程序），本次一并改正。
+bazaar
+
+# 安装完整版引擎（dolphin-install）的工具链：把 Live 系统装到硬盘时
+# 需要在目标系统里装引导并生成 grub.cfg。注意 grub-pc 与
+# grub-efi-amd64 两个平台包互相 Conflicts 不能同装，而 Live 镜像两种
+# 固件都要支持——实查（sid 2.14-5）grub-install/update-grub 本体在
+# grub2-common 里，i386-pc 与 x86_64-efi 的模块分别在 grub-pc-bin、
+# grub-efi-amd64-bin(+unsigned) 里，两个 -bin 包互不冲突。故装
+# common+双 bin 组合，grub-install --target 按固件选模块即可。
+# dosfstools 提供 ESP 的 mkfs.vfat；分区用 fdisk 包的 sfdisk、
+# 复制用 rsync（底座已带，显式写死防丢）。
+grub-common
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+grub-efi-amd64-unsigned
+efibootmgr
+dosfstools
+fdisk
+rsync
+
+# 硬件适配（Alpha 10 用户口径：固件与微码开箱拉满）：通用固件元包、
+# 非自由固件元包（走 non-free-firmware 分区，构建时已启用）、
+# AMD/Intel CPU 微码（开机由内核 initramfs 早期加载）。
+firmware-linux
+firmware-linux-nonfree
+amd64-microcode
+intel-microcode
+
 # 图标/光标主题（显式声明：Alpha 7 时它靠传递依赖带入，
 # 哪天上游依赖关系变了可能悄悄消失，故在此写死）
 adwaita-icon-theme

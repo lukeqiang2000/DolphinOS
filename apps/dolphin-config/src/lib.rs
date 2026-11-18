@@ -105,7 +105,7 @@ impl AnimationMode {
     /// 动画时长（毫秒）。无动画恒为 0。
     pub fn duration_ms(&self) -> u64 {
         match self {
-            AnimationMode::Flip => 320,
+            AnimationMode::Flip => 520,
             AnimationMode::Popup => 160,
             AnimationMode::None => 0,
         }
@@ -173,13 +173,17 @@ pub struct Palette {
 pub fn palette(theme: Theme) -> Palette {
     match theme {
         Theme::Dolphin => Palette {
-            bg: "#0b0e11",
-            panel: "#10151b",
-            card: "#1a2129",
-            card_border: "#2b3644",
-            accent: "#1370f3",
-            text: "#e8eef4",
-            subtext: "#8fa3b8",
+            // Alpha 10：向用户网站现行 Dolphin 主题看齐（2026-11-18 用户令
+            // 「桌面弄成网页一样的」）。网站现行值：底 #0f172a、卡片
+            // rgba(30,41,59,.7)、边框 rgba(255,255,255,.08)、主字 #f8fafc、
+            // 次字 #94a3b8、默认强调 #6366f1（靛蓝）。Slint 侧用等效实色。
+            bg: "#0f172a",
+            panel: "#131f38",
+            card: "#1e293b",
+            card_border: "#2e3d59",
+            accent: "#6366f1",
+            text: "#f8fafc",
+            subtext: "#94a3b8",
             corner_radius: 18.0,
             shape_exponent: 4.5,
         },

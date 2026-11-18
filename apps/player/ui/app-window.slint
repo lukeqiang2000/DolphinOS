@@ -112,22 +112,22 @@ export component AppWindow inherits Window {
                         spacing: 8px;
 
                         Button {
-                            text: "⏮ 上一首";
+                            text: "上一首";
                             clicked => { root.prev-track(); }
                         }
 
                         Button {
-                            text: root.playing ? "⏸ 暂停" : "▶ 播放";
+                            text: root.playing ? "暂停" : "▶ 播放";
                             clicked => { root.play-pause(); }
                         }
 
                         Button {
-                            text: "⏹ 停止";
+                            text: "停止";
                             clicked => { root.stop(); }
                         }
 
                         Button {
-                            text: "⏭ 下一首";
+                            text: "下一首";
                             clicked => { root.next-track(); }
                         }
 

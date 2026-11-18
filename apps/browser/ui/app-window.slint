@@ -72,10 +72,13 @@ export component AppWindow inherits Window {
                 padding-right: 12px;
                 spacing: 10px;
 
-                Text {
-                    text: "🌐";
-                    font-size: 15px;
-                    vertical-alignment: center;
+                // 站点图标占位：自绘圆点（原 🌐 emoji 镜像字体缺失会成豆腐块）
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    y: 15px;
+                    border-radius: 5px;
+                    background: #5b8cff;
                 }
 
                 VerticalLayout {

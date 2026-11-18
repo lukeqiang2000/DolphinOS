@@ -24,9 +24,96 @@ pub fn default_apps() -> Vec<AppEntry> {
         AppEntry { id: "settings", name: "设置", exec: "dolphin-settings", section: "常用", frequent: true },
         AppEntry { id: "photos", name: "照片", exec: "dolphin-photos", section: "媒体", frequent: false },
         AppEntry { id: "player", name: "播放器", exec: "dolphin-player", section: "媒体", frequent: false },
-        AppEntry { id: "store", name: "应用商店", exec: "gnome-software", section: "系统", frequent: false },
+        AppEntry { id: "store", name: "应用商店", exec: "bazaar", section: "系统", frequent: false },
         AppEntry { id: "oobe", name: "首次设置", exec: "dolphin-oobe", section: "系统", frequent: false },
+        // 安装完整版：只在 Live 会话出现（visible_apps 按会话过滤），
+        // 点击直接进向导的安装页；装盘后的系统里没有这张卡。
+        AppEntry { id: "install", name: "安装完整版", exec: "dolphin-oobe --install", section: "系统", frequent: false },
     ]
+}
+
+/// 当前是不是 Live 会话：live-boot 的内核命令行带 boot=live，
+/// 装盘系统的命令行没有。读不到 /proc/cmdline 时按非 Live 处理
+/// （宁可不显示安装入口，也不误装）。
+pub fn is_live_session() -> bool {
+    match std::fs::read_to_string("/proc/cmdline") {
+        Ok(cmdline) => cmdline_is_live(&cmdline),
+        Err(_) => false,
+    }
+}
+
+/// cmdline 是否为 Live 启动（纯函数，便于单测）。
+pub fn cmdline_is_live(cmdline: &str) -> bool {
+    cmdline.split_whitespace().any(|tok| tok == "boot=live")
+}
+
+/// 按会话过滤桌面清单：安装入口只在 Live 显示，其余恒显示。
+pub fn visible_apps(apps: &[AppEntry], live: bool) -> Vec<AppEntry> {
+    apps.iter()
+        .filter(|a| live || a.id != "install")
+        .cloned()
+        .collect()
+}
+
+/// 把 exec 串拆成 (程序, 参数)：exec 允许带空格分隔的参数
+/// （如 "dolphin-oobe --install"），启动时程序名走 resolve_exec、
+/// 参数原样传给子进程。
+pub fn parse_exec(exec: &str) -> (String, Vec<String>) {
+    let mut parts = exec.split_whitespace();
+    let prog = parts.next().unwrap_or("").to_string();
+    (prog, parts.map(|s| s.to_string()).collect())
+}
+
+// ── 打开动画（放大+翻转替身）的几何 ─────────────────────────────
+// 桌面网格布局常量（与 app-window.slint 里的卡片摆位公式一致，改一处改两处）。
+pub const GRID_X: f32 = 24.0;
+pub const GRID_Y: f32 = 40.0;
+pub const CARD_W: f32 = 160.0;
+pub const CARD_H: f32 = 140.0;
+pub const CARD_DX: f32 = 176.0;
+pub const CARD_DY: f32 = 156.0;
+/// 替身放大到的「窗口」矩形（内容坐标）：覆盖整个网格区。
+pub const ANIM_TARGET: (f32, f32, f32, f32) = (24.0, 40.0, 688.0, 500.0);
+
+/// 第 idx 张卡片在内容坐标里的矩形 (x, y, w, h)。
+pub fn card_rect(idx: usize) -> (f32, f32, f32, f32) {
+    (
+        GRID_X + (idx % 4) as f32 * CARD_DX,
+        GRID_Y + (idx / 4) as f32 * CARD_DY,
+        CARD_W,
+        CARD_H,
+    )
+}
+
+/// 缓动：easeInOutCubic（慢-快-慢），p 先夹紧到 [0,1]。
+pub fn ease_in_out_cubic(p: f32) -> f32 {
+    let p = p.clamp(0.0, 1.0);
+    if p < 0.5 {
+        4.0 * p * p * p
+    } else {
+        1.0 - (-2.0 * p + 2.0).powi(3) / 2.0
+    }
+}
+
+/// 动画进度 p 时的替身状态：(x, y, w, h, scale_x, opacity)。
+/// 几何按缓动从卡片矩形插值到目标矩形；翻转用原始进度的 |cos(πp)|
+/// （一圈整翻）；不透明度在最后 25% 线性淡出，把画面交给真实窗口。
+pub fn anim_frame(idx: usize, p: f32) -> (f32, f32, f32, f32, f32, f32) {
+    let p = p.clamp(0.0, 1.0);
+    let e = ease_in_out_cubic(p);
+    let (cx, cy, cw, ch) = card_rect(idx);
+    let (tx, ty, tw, th) = ANIM_TARGET;
+    let lerp = |a: f32, b: f32| a + (b - a) * e;
+    let scale_x = (std::f32::consts::PI * p).cos().abs();
+    let opacity = if p < 0.75 { 1.0 } else { 1.0 - (p - 0.75) / 0.25 };
+    (
+        lerp(cx, tx),
+        lerp(cy, ty),
+        lerp(cw, tw),
+        lerp(ch, th),
+        scale_x,
+        opacity.clamp(0.0, 1.0),
+    )
 }
 
 /// 桌面布局（持久化到 ~/.config/dolphinos/desktop.toml）：只记应用 id 顺序。
@@ -192,5 +279,65 @@ mod tests {
         let first_non_frequent = apps.iter().position(|a| !a.frequent).unwrap();
         assert!(apps[..first_non_frequent].iter().all(|a| a.frequent));
         assert!(first_non_frequent >= 4, "常用应用至少 4 个直接成卡");
+    }
+
+    #[test]
+    fn install_entry_only_visible_in_live() {
+        let apps = default_apps();
+        let installed = visible_apps(&apps, false);
+        assert!(installed.iter().all(|a| a.id != "install"), "装盘会话不得出现安装入口");
+        assert_eq!(installed.len(), apps.len() - 1);
+        let live = visible_apps(&apps, true);
+        assert_eq!(live.len(), apps.len());
+        assert!(live.iter().any(|a| a.id == "install"));
+    }
+
+    #[test]
+    fn cmdline_live_detection() {
+        assert!(cmdline_is_live("BOOT_IMAGE=/vmlinuz boot=live components quiet"));
+        assert!(!cmdline_is_live("BOOT_IMAGE=/vmlinuz root=UUID=abcd quiet"));
+        assert!(!cmdline_is_live(""));
+        assert!(!cmdline_is_live("boot=livecd"), "前缀相似的参数不能误判");
+    }
+
+    #[test]
+    fn parse_exec_splits_args() {
+        let (prog, args) = parse_exec("dolphin-oobe --install");
+        assert_eq!(prog, "dolphin-oobe");
+        assert_eq!(args, vec!["--install".to_string()]);
+        let (prog, args) = parse_exec("bazaar");
+        assert_eq!(prog, "bazaar");
+        assert!(args.is_empty());
+    }
+
+    #[test]
+    fn anim_frame_endpoints_and_midpoint() {
+        // 起点 = 卡片原位原尺寸、scale 1、不透明
+        let (x, y, w, h, s, o) = anim_frame(5, 0.0);
+        let (cx, cy, cw, ch) = card_rect(5);
+        assert_eq!((x, y, w, h), (cx, cy, cw, ch));
+        assert_eq!(s, 1.0);
+        assert_eq!(o, 1.0);
+        // 中点：翻转到侧面（scale≈0），几何已放大一半（缓动中点 e=0.5）
+        let (x, y, w, h, s, o) = anim_frame(5, 0.5);
+        assert!(s < 0.01, "中点应翻到侧面, scale={s}");
+        assert!((w - (cw + ANIM_TARGET.2) / 2.0).abs() < 0.6);
+        assert!((h - (ch + ANIM_TARGET.3) / 2.0).abs() < 0.6);
+        assert_eq!(o, 1.0);
+        let _ = (x, y);
+        // 终点 = 目标矩形、scale 回到 1、完全淡出
+        let (x, y, w, h, s, o) = anim_frame(5, 1.0);
+        assert_eq!((x, y, w, h), ANIM_TARGET);
+        assert_eq!(s, 1.0);
+        assert_eq!(o, 0.0);
+    }
+
+    #[test]
+    fn ease_in_out_endpoints() {
+        assert_eq!(ease_in_out_cubic(0.0), 0.0);
+        assert_eq!(ease_in_out_cubic(1.0), 1.0);
+        assert!((ease_in_out_cubic(0.5) - 0.5).abs() < 1e-6);
+        assert_eq!(ease_in_out_cubic(-1.0), 0.0, "越界夹紧");
+        assert_eq!(ease_in_out_cubic(2.0), 1.0, "越界夹紧");
     }
 }

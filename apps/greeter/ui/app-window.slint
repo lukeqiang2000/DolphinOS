@@ -15,7 +15,7 @@ export component AppWindow inherits Window {
     title: "DolphinOS 登录";
     preferred-width: 800px;
     preferred-height: 600px;
-    background: #0b0e11;
+    background: #0f172a;
 
     VerticalLayout {
         alignment: center;
@@ -34,11 +34,23 @@ export component AppWindow inherits Window {
                     padding: 28px;
                     spacing: 14px;
 
-                    Text {
-                        text: "🐬 DolphinOS";
-                        color: #e8eef4;
-                        font-size: 24px;
-                        horizontal-alignment: center;
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+
+                        Image {
+                            source: @image-url("dolphin.png");
+                            width: 63px;
+                            height: 42px;
+                            image-fit: contain;
+                        }
+
+                        Text {
+                            text: "DolphinOS";
+                            color: #e8eef4;
+                            font-size: 24px;
+                            vertical-alignment: center;
+                        }
                     }
 
                     Text {

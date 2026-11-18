@@ -1,5 +1,10 @@
-// DolphinOS Shell 正式版界面：28px 窄顶栏（时间+状态）+ 板块网格桌面 + 左上角找应用入口 + 系统板块卡。
-// 主题配色/圆角由 Rust 按 dolphin-config 的 palette() 注入属性，切换主题即换整套数据层皮肤。
+// DolphinOS Shell 界面：28px 窄顶栏（海豚按钮+时间+状态）+ 板块网格桌面 + 找应用面板 + 系统板块卡。
+// Alpha 10 观感重做（用户令「桌面弄成网页一样的」）：配色与用户网站现行
+// Dolphin 主题对齐（值在 dolphin-config 调色板）；Dolphin 主题下卡片用
+// 自编 squircle 轮廓（Path 点列与网站 clip-path 同一套超椭圆算法，由
+// Rust 注入命令串），其余主题用圆角矩形。卡片图标、调序箭头、状态点
+// 全部改自绘矢量，不再依赖字体符号字形（防豆腐块，见 ALPHA10-REPORT
+// 的字符排查表）。打开动画的放大翻转替身也在本文件（anim-* 属性驱动）。
 
 import { LineEdit, ScrollView } from "std-widgets.slint";
 
@@ -9,6 +14,44 @@ export struct DesktopCard {
     exec: string,
     section: string,
     frequent: bool,
+}
+
+// 五角星（20x20 画布的矢量点列）：常用应用标记，替代 ★ 字符。
+component StarIcon inherits Path {
+    in property <color> fill-col;
+    width: 20px;
+    height: 20px;
+    commands: "M 10 0.5 L 12.9 7.1 L 20 7.6 L 14.5 12.4 L 16.2 19.5 L 10 15.6 L 3.8 19.5 L 5.5 12.4 L 0 7.6 L 7.1 7.1 Z";
+    fill: root.fill-col;
+}
+
+// 四宫格（2x2 圆角小方块）：非常用应用标记，替代 ▦ 字符。
+component GridIcon inherits Rectangle {
+    in property <color> fill-col;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    Rectangle { x: 1px; y: 1px; width: 8px; height: 8px; border-radius: 2px; background: root.fill-col; }
+    Rectangle { x: 11px; y: 1px; width: 8px; height: 8px; border-radius: 2px; background: root.fill-col; }
+    Rectangle { x: 1px; y: 11px; width: 8px; height: 8px; border-radius: 2px; background: root.fill-col; }
+    Rectangle { x: 11px; y: 11px; width: 8px; height: 8px; border-radius: 2px; background: root.fill-col; }
+}
+
+// 调序三角（22x22 画布）：替代 ◀ ▶ 字符。
+component TriButton inherits Rectangle {
+    in property <bool> left;
+    in property <color> fill-col;
+    callback clicked();
+    width: 22px;
+    height: 22px;
+    background: transparent;
+    Path {
+        width: 22px;
+        height: 22px;
+        commands: root.left ? "M 15 3 L 6 11 L 15 19 Z" : "M 7 3 L 16 11 L 7 19 Z";
+        fill: root.fill-col;
+    }
+    TouchArea { clicked => { root.clicked(); } }
 }
 
 component Card inherits Rectangle {
@@ -22,6 +65,8 @@ component Card inherits Rectangle {
     in property <color> text-col;
     in property <color> sub-col;
     in property <color> accent-col;
+    in property <bool> squircle;
+    in property <string> squircle-path;
     in property <float> flip-scale: 1.0;
     callback launch(int);
     callback shift(int, int);
@@ -33,54 +78,65 @@ component Card inherits Rectangle {
     Rectangle {
         width: 100%;
         height: 100%;
-        border-radius: root.radius;
-        background: root.card-bg;
-        border-width: 1px;
-        border-color: root.border-col;
-        // 翻转动画的横向缩放必须挂在非根元素上（根元素 transform 不生效，编译器实测）
+        background: transparent;
+        // 翻转/弹入的横向缩放挂在非根元素上（根元素 transform 不生效）
         transform-scale-x: root.flip-scale;
 
+        // 背景层：Dolphin 主题 = squircle 轮廓；其余主题 = 圆角矩形
+        if root.squircle: Path {
+            width: 100%;
+            height: 100%;
+            commands: root.squircle-path;
+            fill: root.card-bg;
+            stroke: root.border-col;
+            stroke-width: 1px;
+        }
+        if !root.squircle: Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: root.radius;
+            background: root.card-bg;
+            border-width: 1px;
+            border-color: root.border-col;
+        }
+
         VerticalLayout {
-        padding: 12px;
-        spacing: 6px;
+            padding: 14px;
+            spacing: 6px;
 
-        HorizontalLayout {
+            HorizontalLayout {
+                if root.frequent: StarIcon { fill-col: root.accent-col; }
+                if !root.frequent: GridIcon { fill-col: root.accent-col; }
+                Rectangle {}
+                TriButton {
+                    left: true;
+                    fill-col: root.sub-col;
+                    clicked => { root.shift(root.idx, root.idx - 1); }
+                }
+                TriButton {
+                    left: false;
+                    fill-col: root.sub-col;
+                    clicked => { root.shift(root.idx, root.idx + 1); }
+                }
+            }
+
             Text {
-                text: root.frequent ? "★" : "▦";
-                color: root.accent-col;
-                font-size: 20px;
+                text: root.name;
+                color: root.text-col;
+                font-size: 17px;
+                font-weight: 600;
             }
-            Rectangle {}
-            Rectangle {
-                width: 22px;
-                height: 22px;
-                Text { text: "◀"; color: root.sub-col; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                TouchArea { clicked => { root.shift(root.idx, root.idx - 1); } }
-            }
-            Rectangle {
-                width: 22px;
-                height: 22px;
-                Text { text: "▶"; color: root.sub-col; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                TouchArea { clicked => { root.shift(root.idx, root.idx + 1); } }
-            }
-        }
 
-        Text {
-            text: root.name;
-            color: root.text-col;
-            font-size: 17px;
+            Text {
+                text: root.section;
+                color: root.sub-col;
+                font-size: 11px;
+            }
         }
-
-        Text {
-            text: root.section;
-            color: root.sub-col;
-            font-size: 11px;
-        }
-    }
 
         TouchArea {
-            y: 44px;
-            height: parent.height - 44px;
+            y: 46px;
+            height: parent.height - 46px;
             clicked => { root.launch(root.idx); }
         }
     }
@@ -110,22 +166,33 @@ component BarButton inherits Rectangle {
 export component AppWindow inherits Window {
     in-out property <string> clock: "--:--";
     in property <string> theme-name: "Dolphin";
-    in property <color> c-bg: #0b0e11;
-    in property <color> c-panel: #10151b;
-    in property <color> c-card: #1a2129;
-    in property <color> c-border: #2b3644;
-    in property <color> c-accent: #1370f3;
-    in property <color> c-text: #e8eef4;
-    in property <color> c-sub: #8fa3b8;
+    in property <color> c-bg: #0f172a;
+    in property <color> c-panel: #131f38;
+    in property <color> c-card: #1e293b;
+    in property <color> c-border: #2e3d59;
+    in property <color> c-accent: #6366f1;
+    in property <color> c-text: #f8fafc;
+    in property <color> c-sub: #94a3b8;
     in property <length> corner-radius: 18px;
+    in property <bool> use-squircle: false;
+    in property <string> card-path: "";
+    in property <string> syscard-path: "";
     in property <[DesktopCard]> cards;
     in property <[DesktopCard]> launcher-cards;
     in-out property <bool> launcher-open: false;
     in-out property <string> search-text: "";
-    in-out property <bool> show-entry-text: true;
     in property <int> flipping-index: -1;
     in property <float> flip-scale: 1.0;
     in property <string> status-text: "";
+    // 打开动画替身（放大+翻转）：Rust 定时器逐帧写入几何与翻转量
+    in property <bool> anim-active: false;
+    in property <length> anim-x: 0px;
+    in property <length> anim-y: 0px;
+    in property <length> anim-w: 0px;
+    in property <length> anim-h: 0px;
+    in property <float> anim-scale-x: 1.0;
+    in property <float> anim-opacity: 1.0;
+    in property <string> anim-name: "";
 
     callback launch-app(int);
     callback shift-card(int, int);
@@ -139,8 +206,29 @@ export component AppWindow inherits Window {
     preferred-height: 800px;
     background: root.c-bg;
 
+    // 背景氛围光（向网站默认背景的双色径向渐变看齐的近似：两团低透光晕，
+    // 仅 Dolphin 主题显示；Slint 无径向渐变，用大圆低透明度近似）
+    if root.use-squircle: Rectangle {
+        x: -140px;
+        y: -160px;
+        width: 520px;
+        height: 520px;
+        border-radius: 260px;
+        background: #6366f1;
+        opacity: 0.13;
+    }
+    if root.use-squircle: Rectangle {
+        x: root.width - 380px;
+        y: root.height - 360px;
+        width: 520px;
+        height: 520px;
+        border-radius: 260px;
+        background: #10b981;
+        opacity: 0.09;
+    }
+
     VerticalLayout {
-        // ── 28px 窄顶栏：只放时间与状态图标（规格定案）──
+        // ── 28px 窄顶栏：海豚按钮（找应用）+ 时间 + 状态点 ──
         Rectangle {
             height: 28px;
             background: root.c-panel;
@@ -150,36 +238,47 @@ export component AppWindow inherits Window {
                 padding-right: 12px;
                 spacing: 10px;
 
-                // 左上角找应用入口：文字先显示、数秒后自动隐藏，悬停再显示
+                // 左上角找应用入口（Alpha 10 改定案：海豚图标按钮，
+                // 与开机/GRUB 同一套实心海豚素材；点击弹出应用搜索面板）
                 Rectangle {
                     width: 64px;
                     background: transparent;
+                    Image {
+                        source: @image-url("dolphin.png");
+                        width: 38px;
+                        height: 25px;
+                        image-fit: contain;
+                        x: 2px;
+                        y: 6px;
+                    }
                     Text {
                         text: "应用";
                         color: root.c-sub;
-                        font-size: 12px;
+                        font-size: 11px;
+                        x: 48px;
                         vertical-alignment: center;
-                        visible: entry-touch.has-hover || root.show-entry-text;
                     }
-                    Text {
-                        text: "▦";
-                        color: root.c-sub;
-                        font-size: 12px;
-                        vertical-alignment: center;
-                        visible: !entry-touch.has-hover && !root.show-entry-text;
-                    }
-                    entry-touch := TouchArea {
+                    TouchArea {
                         clicked => { root.launcher-open = !root.launcher-open; }
                     }
                 }
 
                 Rectangle {}
 
-                Text {
-                    text: "◉ ◉";
-                    color: root.c-sub;
-                    font-size: 11px;
-                    vertical-alignment: center;
+                // 状态点（自绘圆点，替代 ◉ 字符）
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    y: 10px;
+                    border-radius: 4px;
+                    background: root.c-sub;
+                }
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    y: 10px;
+                    border-radius: 4px;
+                    background: root.c-sub;
                 }
 
                 Text {
@@ -189,12 +288,21 @@ export component AppWindow inherits Window {
                     vertical-alignment: center;
                 }
             }
+
+            // 顶栏底部发丝线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: root.c-border;
+            }
         }
 
-        // ── 找应用面板（滚轮/搜索展开全部应用）──
+        // ── 找应用面板（搜索展开全部应用）──
         if root.launcher-open: Rectangle {
             height: 264px;
             background: root.c-panel;
+            border-width: 1px;
+            border-color: root.c-border;
 
             VerticalLayout {
                 padding: 12px;
@@ -211,7 +319,7 @@ export component AppWindow inherits Window {
                         spacing: 2px;
                         for card in root.launcher-cards: Rectangle {
                             height: 34px;
-                            border-radius: 6px;
+                            border-radius: 8px;
                             background: transparent;
                             HorizontalLayout {
                                 padding-left: 8px;
@@ -235,7 +343,7 @@ export component AppWindow inherits Window {
                 Text {
                     x: 24px;
                     y: 10px;
-                    text: "桌面 · 常用应用直接成卡，其余按板块排列（卡片 ◀ ▶ 可调顺序，位置会记住）";
+                    text: "桌面 · 常用应用直接成卡，其余按板块排列（卡片箭头可调顺序，位置会记住）";
                     color: root.c-sub;
                     font-size: 12px;
                 }
@@ -253,6 +361,8 @@ export component AppWindow inherits Window {
                     text-col: root.c-text;
                     sub-col: root.c-sub;
                     accent-col: root.c-accent;
+                    squircle: root.use-squircle;
+                    squircle-path: root.card-path;
                     flip-scale: root.flipping-index == card.idx ? root.flip-scale : 1.0;
                     launch(idx) => { root.launch-app(idx); }
                     shift(from, to) => { root.shift-card(from, to); }
@@ -264,15 +374,29 @@ export component AppWindow inherits Window {
                     y: 56px + (root.cards.length + 3) / 4 * 156px;
                     width: 688px;
                     height: 120px;
-                    border-radius: root.corner-radius;
-                    background: root.c-card;
-                    border-width: 1px;
-                    border-color: root.c-border;
+                    background: transparent;
+
+                    if root.use-squircle: Path {
+                        width: 100%;
+                        height: 100%;
+                        commands: root.syscard-path;
+                        fill: root.c-card;
+                        stroke: root.c-border;
+                        stroke-width: 1px;
+                    }
+                    if !root.use-squircle: Rectangle {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: root.corner-radius;
+                        background: root.c-card;
+                        border-width: 1px;
+                        border-color: root.c-border;
+                    }
 
                     VerticalLayout {
                         padding: 14px;
                         spacing: 10px;
-                        Text { text: "系统"; color: root.c-text; font-size: 15px; }
+                        Text { text: "系统"; color: root.c-text; font-size: 15px; font-weight: 600; }
                         HorizontalLayout {
                             spacing: 10px;
                             BarButton { label: "设置"; text-col: root.c-text; panel-bg: root.c-panel; clicked => { root.open-settings(); } }
@@ -288,6 +412,36 @@ export component AppWindow inherits Window {
                     text: root.status-text;
                     color: root.c-sub;
                     font-size: 12px;
+                }
+
+                // ── 打开动画替身：从卡片几何放大到窗口大小、同时绕竖轴翻转，
+                //    后半段淡出把画面交给真实窗口（几何由 Rust 逐帧算好写入）──
+                if root.anim-active: Rectangle {
+                    x: root.anim-x;
+                    y: root.anim-y;
+                    width: root.anim-w;
+                    height: root.anim-h;
+                    background: transparent;
+                    opacity: root.anim-opacity;
+
+                    Rectangle {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: root.corner-radius;
+                        background: root.c-card;
+                        border-width: 1px;
+                        border-color: root.c-accent;
+                        transform-scale-x: root.anim-scale-x;
+
+                        Text {
+                            text: root.anim-name;
+                            color: root.c-text;
+                            font-size: 20px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
             }
         }

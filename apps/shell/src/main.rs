@@ -36,12 +36,27 @@ fn parse_hex(s: &str) -> Color {
 }
 
 /// 真正拉起一个应用进程（找不到/起不来只回状态文本，不让 Shell 崩）。
+/// exec 可带参数（如 "dolphin-oobe --install"）：程序名走同目录优先解析，
+/// 参数原样传给子进程。
 fn spawn_app(ui: &AppWindow, exec: &str) {
-    let prog = logic::resolve_exec(exec);
-    match Command::new(&prog).spawn() {
+    let (prog, args) = logic::parse_exec(exec);
+    let prog = logic::resolve_exec(&prog);
+    match Command::new(&prog).args(&args).spawn() {
         Ok(_) => ui.set_status_text(format!("已打开 {exec}").into()),
         Err(e) => ui.set_status_text(format!("打开 {exec} 失败：{e}（可能尚未打包进系统）").into()),
     }
+}
+
+/// squircle 轮廓的 Slint Path 命令串（点列与网站 clip-path 同一套
+/// 超椭圆算法，左上角原点坐标系）。
+fn squircle_path(w: f32, h: f32) -> String {
+    let pts = dolphin_shape::squircle_points_xy(w, h, 48);
+    let mut s = String::new();
+    for (i, (x, y)) in pts.iter().enumerate() {
+        s.push_str(&format!("{} {:.1} {:.1} ", if i == 0 { "M" } else { "L" }, x, y));
+    }
+    s.push('Z');
+    s
 }
 
 fn cards_model(entries: &[AppEntry]) -> ModelRc<DesktopCard> {
@@ -79,6 +94,7 @@ fn launcher_model(entries: &[AppEntry], query: &str) -> ModelRc<DesktopCard> {
 /// 一次打开动画的进行状态。
 struct AnimState {
     exec: String,
+    idx: usize,
     mode: AnimationMode,
     start: Instant,
     launched: bool,
@@ -92,9 +108,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let settings = dolphin_config::load_settings();
     let palette = dolphin_config::palette(settings.theme);
 
-    // 桌面顺序：读持久化布局，套到默认清单上。
+    // 桌面顺序：读持久化布局，套到默认清单上；再按会话过滤
+    // （安装完整版入口只在 Live 会话出现）。
     let layout = logic::load_layout_from(&logic::layout_path());
-    let entries = Rc::new(RefCell::new(logic::apply_saved_order(&layout.order)));
+    let ordered = logic::apply_saved_order(&layout.order);
+    let entries = Rc::new(RefCell::new(logic::visible_apps(&ordered, logic::is_live_session())));
 
     let ui = AppWindow::new()?;
     // 桌面 Shell 占满整个输出：Alpha 8 在 VirtualBox 里浮动窗口（1280x800）
@@ -111,8 +129,30 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.set_c_text(parse_hex(palette.text));
     ui.set_c_sub(parse_hex(palette.subtext));
     ui.set_corner_radius(palette.corner_radius);
+    // Dolphin 主题用 squircle 轮廓（与网站同一套算法生成的 Path 点列），
+    // 其余主题继续用圆角矩形。
+    let is_dolphin = settings.theme.as_str() == "Dolphin";
+    ui.set_use_squircle(is_dolphin);
+    if is_dolphin {
+        ui.set_card_path(squircle_path(logic::CARD_W, logic::CARD_H).into());
+        ui.set_syscard_path(squircle_path(688.0, 120.0).into());
+    }
     ui.set_cards(cards_model(&entries.borrow()));
     ui.set_launcher_cards(launcher_model(&entries.borrow(), ""));
+
+    // 动画 QA 钩子：DOLPHIN_SHELL_ANIM_PREVIEW=1 时把放大翻转替身冻结在
+    // 中点帧，供截屏核对（正常运行不设此变量，无任何影响）。
+    if std::env::var("DOLPHIN_SHELL_ANIM_PREVIEW").is_ok() {
+        let (x, y, w, h, s, o) = logic::anim_frame(1, 0.5);
+        ui.set_anim_x(x);
+        ui.set_anim_y(y);
+        ui.set_anim_w(w);
+        ui.set_anim_h(h);
+        ui.set_anim_scale_x(s);
+        ui.set_anim_opacity(o);
+        ui.set_anim_name("浏览器".into());
+        ui.set_anim_active(true);
+    }
 
     // 顶栏时钟：每秒刷新。
     {
@@ -125,18 +165,6 @@ fn main() -> Result<(), slint::PlatformError> {
         });
         // Timer 必须存活到程序结束：泄漏到静态生命周期（Shell 常驻进程，可接受）。
         std::mem::forget(clock_timer);
-    }
-
-    // 找应用入口文字：显示数秒后自动隐藏（悬停再显示，见 .slint 绑定）。
-    {
-        let weak = ui.as_weak();
-        let hide_timer = Timer::default();
-        hide_timer.start(TimerMode::SingleShot, Duration::from_millis(3500), move || {
-            if let Some(ui) = weak.upgrade() {
-                ui.set_show_entry_text(false);
-            }
-        });
-        std::mem::forget(hide_timer);
     }
 
     // 打开动画定时器：常驻 16ms 一拍，无动画进行时第一行就返回。
@@ -157,9 +185,16 @@ fn main() -> Result<(), slint::PlatformError> {
             let p = (state.start.elapsed().as_millis() as f64 / total as f64).min(1.0);
             match state.mode {
                 AnimationMode::Flip => {
-                    // 绕竖轴翻转的近似：横向缩放 = |cos(π·p)|，翻到中点（换面）时启动应用。
-                    let scale = (std::f64::consts::PI * p).cos().abs();
-                    ui.set_flip_scale(scale as f32);
+                    // 放大+翻转替身（Alpha 10 新规格，取代旧「卡片原地翻面」）：
+                    // 替身从卡片矩形缓动放大到窗口矩形、同时绕竖轴整翻一圈，
+                    // 翻到中点（正反面交替瞬间）启动应用，后段淡出交棒真实窗口。
+                    let (x, y, w, h, s, o) = logic::anim_frame(state.idx, p as f32);
+                    ui.set_anim_x(x);
+                    ui.set_anim_y(y);
+                    ui.set_anim_w(w);
+                    ui.set_anim_h(h);
+                    ui.set_anim_scale_x(s);
+                    ui.set_anim_opacity(o);
                     if p >= 0.5 && !state.launched {
                         state.launched = true;
                         let exec = state.exec.clone();
@@ -181,6 +216,7 @@ fn main() -> Result<(), slint::PlatformError> {
             if p >= 1.0 {
                 ui.set_flip_scale(1.0);
                 ui.set_flipping_index(-1);
+                ui.set_anim_active(false);
                 *slot = None;
             }
         });
@@ -195,18 +231,31 @@ fn main() -> Result<(), slint::PlatformError> {
         let mode = settings.animation;
         ui.on_launch_app(move |idx| {
             let Some(ui) = weak.upgrade() else { return };
-            let exec = {
+            let (exec, name) = {
                 let entries = entries_ref.borrow();
                 let Some(app) = entries.get(idx as usize) else { return };
-                app.exec.to_string()
+                (app.exec.to_string(), app.name.to_string())
             };
             match mode {
                 AnimationMode::None => spawn_app(&ui, &exec),
-                AnimationMode::Flip | AnimationMode::Popup => {
+                AnimationMode::Flip => {
+                    // 放大翻转走替身层：先亮替身（首帧几何由定时器下一拍写入）
+                    ui.set_anim_name(name.into());
+                    ui.set_anim_active(true);
+                    *anim_ref.borrow_mut() = Some(AnimState {
+                        exec,
+                        idx: idx as usize,
+                        mode,
+                        start: Instant::now(),
+                        launched: false,
+                    });
+                }
+                AnimationMode::Popup => {
                     ui.set_flipping_index(idx);
                     ui.set_flip_scale(1.0);
                     *anim_ref.borrow_mut() = Some(AnimState {
                         exec,
+                        idx: idx as usize,
                         mode,
                         start: Instant::now(),
                         launched: false,

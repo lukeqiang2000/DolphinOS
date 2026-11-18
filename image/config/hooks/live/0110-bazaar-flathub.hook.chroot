@@ -1,0 +1,25 @@
+#!/bin/sh
+# DolphinOS 应用商店收尾 hook（chroot 阶段执行，排在 0100 之后）：
+# 给系统级 flatpak 预置 Flathub 源，Bazaar（包列表里的 bazaar）开机
+# 就能浏览/安装 Flathub 上的应用，不用用户再手动加源。
+# remote-add 读 includes.chroot 预置的 flathub.flatpakrepo 文件完成，
+# 只写 /var/lib/flatpak 的源配置，不需要网络与守护进程；
+# flatpak 本体由 bazaar 的包依赖带入，缺了就明确警告、不中断构建。
+set -e
+
+REPO_FILE=/usr/share/dolphinos/flathub.flatpakrepo
+
+if ! command -v flatpak >/dev/null 2>&1; then
+    echo "警告: flatpak 不在位（bazaar 未装？），跳过 Flathub 源预置" >&2
+    exit 0
+fi
+
+if [ ! -f "$REPO_FILE" ]; then
+    echo "警告: $REPO_FILE 缺失，跳过 Flathub 源预置" >&2
+    exit 0
+fi
+
+flatpak remote-add --system --if-not-exists flathub "$REPO_FILE" || \
+    echo "警告: 预置 Flathub 系统源失败，Bazaar 首次启动时需手动添加" >&2
+
+echo "0110: Flathub 系统源预置完成"

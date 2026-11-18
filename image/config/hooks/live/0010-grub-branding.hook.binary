@@ -11,12 +11,13 @@ set -e
 GRUB_CFG="boot/grub/grub.cfg"
 
 if [ -f "${GRUB_CFG}" ]; then
-    # Alpha 9：开机不显示菜单、直接进默认条目（模板 grub.cfg 里已有同款两行，
+    # Alpha 10：开机不显示菜单、直接进默认条目（模板 grub.cfg 里已有同款两行，
     # 这里是双保险：若 live-build 换了模板处理方式，最终文件仍被强制改掉）。
-    # timeout_style=hidden 时倒计时内不显示菜单、只等按键；timeout=1 留一次
-    # 按住 Shift（BIOS）或 Esc（UEFI）调出菜单的恢复机会，超时即自动启动。
+    # timeout_style=hidden + timeout=0：不留可被按键打断的倒计时窗口
+    # （Alpha 9 的 timeout=1 在 VirtualBox 里被窗口内的按键事件取消倒计时、
+    # 停在菜单等选择，见 grub.cfg 模板注释）；按住 Shift/Esc 仍可调出菜单。
     if ! grep -q 'timeout_style=hidden' "${GRUB_CFG}"; then
-        sed -i '/^source \/boot\/grub\/config.cfg$/a set timeout_style=hidden\nset timeout=1' "${GRUB_CFG}"
+        sed -i '/^source \/boot\/grub\/config.cfg$/a set timeout_style=hidden\nset timeout=0' "${GRUB_CFG}"
     fi
     sed -i \
         -e 's| fail-safe mode)| Safe Mode)|g' \

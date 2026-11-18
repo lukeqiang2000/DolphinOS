@@ -4,9 +4,13 @@ live-boot
 live-config
 systemd-sysv
 
-# 开机动画（自研 dolphin script 主题在 includes.chroot 里，
-# 默认主题切换与 initramfs 重建见 0100-plymouth-theme.hook.chroot）
+# 开机动画（Alpha 10 起：dolphin 主题改用 two-step 插件实现，
+# two-step.so 由 plymouth-themes 包提供，必须一并装入；
+# 原 script 插件在 plymouth 26.134.222 里对一切 script 主题必崩，
+# 见 ALPHA10-REPORT.md 的二分取证。主题文件与默认主题切换见
+# includes.chroot 与 0100-plymouth-theme.hook.chroot）
 plymouth
+plymouth-themes
 
 # Wayland 会话与登录链（Alpha 7：greetd + 自研 dolphin-greeter；
 # Alpha 8：greeter 改由 cage 托管，见 greetd config.toml 的说明；
@@ -25,8 +29,12 @@ xwayland
 # swaybg：登录后蓝底兜底（Shell 没起来时证明合成器活着）
 # foot：Super+Shift+Enter 兜底终端（主终端已换自研 dolphin-terminal）
 # thunar 已移除：文件管理由自研 dolphin-files 接替
+# wlr-randr：Alpha 10 起 autostart 用它做输出收敛（只启用第一块
+# connected 输出，其余关闭），配合 rc.xml 的 autoEnableOutputs=no，
+# 防止 Shell 全屏窗口被 labwc 放到不可见的幻影输出上
 swaybg
 foot
+wlr-randr
 
 # 自研应用运行时库（dolphin-* 二进制由 CI 注入 /usr/bin）
 # Slint 运行时、浏览器 WebKit 内核运行时、播放器 GStreamer 运行时

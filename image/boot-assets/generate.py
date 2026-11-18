@@ -9,9 +9,12 @@
 #         640x480 的 isolinux/splash.png，同一文件复用）。
 #   2. image/config/bootloaders/grub-pc/live-theme/select_*.png
 #      —— GRUB 主题里选中项的九宫格切片（Dolphin 蓝圆角条）。
-#   3. image/config/includes.chroot/usr/share/plymouth/themes/dolphin/frame-XX.png
-#      —— Plymouth script 主题的 12 帧游动动画（透明底，背景渐变由
-#         dolphin.script 用 Window.SetBackground*Color 画）。
+#   3. image/config/includes.chroot/usr/share/plymouth/themes/dolphin/
+#      animation-XXXX.png 与 throbber-XXXX.png（同一批帧、两组名字）
+#      —— Plymouth two-step 主题的 12 帧游动动画（透明底，背景渐变由
+#         主题的 BackgroundStart/EndColor 画）。Alpha 10 起改用
+#         two-step：script 插件在 plymouth 26.134.222 里必崩，见
+#         ALPHA10-REPORT.md。
 #
 # 标志造型（Alpha 9 重做，用户原话「图标太丑」）：
 # 旧版是细线稿海豚（仅描边 + 10% 透明填充），在深蓝底上显得单薄。
@@ -251,9 +254,12 @@ def write_frames(count=12):
                fill=TITLE + (235,))
         d.text((512, 580), "A L P H A", font=sub_font, anchor="mm",
                fill=SUBTITLE + (225,))
-        path = os.path.join(PLYMOUTH_DIR, f"frame-{i:02d}.png")
-        frame.save(path, optimize=True)
-        print(f"frame-{i:02d}.png:", os.path.getsize(path), "bytes")
+        # two-step 主题按 animation-%04d / throbber-%04d 两组名字取帧，
+        # 同一批帧写两份（序号从 1 起）。
+        for prefix in ("animation", "throbber"):
+            path = os.path.join(PLYMOUTH_DIR, f"{prefix}-{i + 1:04d}.png")
+            frame.save(path, optimize=True)
+            print(f"{prefix}-{i + 1:04d}.png:", os.path.getsize(path), "bytes")
 
 
 if __name__ == "__main__":

@@ -1,21 +1,22 @@
 #!/bin/sh
 # DolphinOS 开机动画收尾 hook（chroot 阶段执行，排在 0090 之后）：
 #
-# 背景：plymouth 的 initramfs hook 收录哪套主题，看的是
-# default.plymouth 的 update-alternatives 指向，而不是 plymouthd.conf
-# （plymouth 24.x 包的 /usr/share/initramfs-tools/hooks/plymouth 实证：
-# 它用 update-alternatives --query default.plymouth 取主题路径，再把
-# 整个主题目录拷进 initramfs）。所以这里必须：
-#   1. 把 default.plymouth 的 alternatives 指到 dolphin 主题；
-#      优先用 plymouth-set-default-theme（若该版本 plymouth 还带），
-#      否则直接用 update-alternatives 注册+选定（等价操作，不依赖
-#      那个在新版包里已不附带的脚本）；
-#   2. plymouthd.conf 与之对齐（includes.chroot 已带 Theme=dolphin，
+# 机制（Alpha 10 实读 plymouth 26.134.222 的 initramfs hook 后更正）：
+# /usr/share/initramfs-tools/hooks/plymouth 用 plymouth-set-default-theme
+# 取主题名（它读 /etc/plymouth/plymouthd.conf 的 Theme=），再按主题
+# .plymouth 里的 ModuleName 把对应插件 .so 与整个主题目录拷进
+# initramfs。所以要让 dolphin 主题（two-step 插件）进 initramfs：
+#   1. plymouthd.conf 必须是 Theme=dolphin（includes.chroot 已带，
 #      这里兜底校验）；
+#   2. two-step.so 必须在 rootfs 里（由 plymouth-themes 包提供，
+#      已列入包列表；这里在位校验，缺了明确警告）；
 #   3. update-initramfs -u —— 在主题文件已随 includes 落地后重建
-#      initramfs，把 dolphin 主题（script 插件 + 12 帧图）打进去。
+#      initramfs，把 dolphin 主题（two-step 插件 + 12 帧图）打进去。
 # chroot 阶段顺序上 initramfs 在内核安装时已生成过一版，hooks 在其后
 # 运行，本 hook 的重建是最终版，binary 阶段拷走的就是这一版。
+# （旧注释里「看 default.plymouth alternatives」的说法是 24.x 时代的
+# 假设，与 26.x 的实际 hook 不符，已更正；下面的 alternatives 设置
+# 保留为无害的兼容动作，不再是主题进 initramfs 的决定因素。）
 set -e
 
 THEME_FILE=/usr/share/plymouth/themes/dolphin/dolphin.plymouth
@@ -23,6 +24,13 @@ THEME_FILE=/usr/share/plymouth/themes/dolphin/dolphin.plymouth
 if [ ! -f "${THEME_FILE}" ]; then
     echo "警告: dolphin plymouth 主题不在位，跳过开机动画设置" >&2
     exit 0
+fi
+
+# two-step 插件在位校验：dolphin 主题的 ModuleName=two-step，
+# initramfs hook 按它去 PLUGIN_PATH 找 two-step.so，缺了会整段跳过
+# plymouth 收录、开机动画直接消失，故这里先明确报警。
+if [ ! -f /usr/lib/x86_64-linux-gnu/plymouth/two-step.so ]; then
+    echo "警告: two-step.so 不在位（plymouth-themes 未装？），开机动画将不生效" >&2
 fi
 
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then

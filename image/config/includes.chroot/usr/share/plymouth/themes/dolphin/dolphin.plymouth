@@ -1,8 +1,73 @@
 [Plymouth Theme]
 Name=Dolphin
 Description=DolphinOS boot animation: line-art dolphin, no progress bar
-ModuleName=script
+ModuleName=two-step
 
-[script]
+# DolphinOS 开机动画（Alpha 10 起改用 two-step 插件实现）
+#
+# 规格（用户定案）：海豚动画、无加载条、简洁感参考 Pixel 首次开机
+# 动画。画面与原 script 主题版一致：深蓝渐变背景（与 GRUB 菜单背景
+# 同色系）+ 居中海豚 12 帧循环，帧图与 GRUB 标志同一套海豚图
+# （image/boot-assets 生成），不显示任何进度条（各模式
+# UseProgressBar=false，boot-up 本就不画进度条）。
+# 12 帧同时以 animation-XXXX 与 throbber-XXXX 两组名字提供：
+# two-step 在不同阶段分别取这两组帧，任一组被取用都是同一段海豚动画。
+# bullet/capslock/entry/keyboard/keymap-render/lock 是口令对话框的
+# 通用素材（取自 plymouth 原装 spinner 主题），仅在系统要求输入
+# 口令时才会用到。
+#
+# 为什么不用 script 插件（Alpha 10 取证结论，见 ALPHA10-REPORT.md）：
+# plymouth 26.134.222（sid 现行版）的 script.so 在 ply_boot_splash_show
+# 阶段必崩（script_lib_sprite_refresh → ply_console_viewer_hide 空
+# 指针），二分实测：原装 script 主题、只有背景调用的极简 script、
+# 延迟建精灵的海豚主题全部同点崩溃，与主题内容无关；details 与
+# two-step 插件均正常。故海豚动画迁到 two-step 实现，效果不变。
+
+[two-step]
+Font=DejaVu Sans 12
+TitleFont=DejaVu Sans 30
 ImageDir=/usr/share/plymouth/themes/dolphin
-ScriptFile=/usr/share/plymouth/themes/dolphin/dolphin.script
+DialogHorizontalAlignment=.5
+DialogVerticalAlignment=.5
+TitleHorizontalAlignment=.5
+TitleVerticalAlignment=.382
+HorizontalAlignment=.5
+VerticalAlignment=.5
+WatermarkHorizontalAlignment=.5
+WatermarkVerticalAlignment=.96
+Transition=none
+TransitionDuration=0.0
+BackgroundStartColor=0x0d63d9
+BackgroundEndColor=0x051430
+ProgressBarBackgroundColor=0x606060
+ProgressBarForegroundColor=0xffffff
+MessageBelowAnimation=true
+
+[boot-up]
+UseEndAnimation=false
+
+[shutdown]
+UseEndAnimation=false
+
+[reboot]
+UseEndAnimation=false
+
+[updates]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=false
+
+[system-upgrade]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=false
+
+[firmware-upgrade]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=false
+
+[system-reset]
+SuppressMessages=true
+ProgressBarShowPercentComplete=false
+UseProgressBar=false

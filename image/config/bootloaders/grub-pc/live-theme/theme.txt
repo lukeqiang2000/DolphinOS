@@ -11,13 +11,15 @@ title-font: "Unifont Regular 16"
 message-font: "Unifont Regular 16"
 terminal-font: "Unifont Regular 16"
 
-# 底部帮助栏
+# 底部帮助栏（文案直接写英文实文案：live-build 不会替换 d-i 风格的
+# @KEYMAP_SHORT@ 占位符，Alpha 9 的 ISO 里它被原样显示，故不用占位符；
+# 全英文也避开 GRUB 默认字体缺中文字形时的方框问题）
 + label {
         top = 100%-50
         left = 0
         width = 100%
         height = 20
-        text = "@KEYMAP_SHORT@"
+        text = "Use the arrow keys to select an entry, then press Enter to boot"
         align = "center"
         color = "#8fa3b8"
         font = "Unifont Regular 16"
@@ -54,5 +56,5 @@ terminal-font: "Unifont Regular 16"
         fg_color = "#1370f3"
         bg_color = "#0a1c33"
         border_color = "#2f7fe0"
-        text = "@TIMEOUT_NOTIFICATION_LONG@"
+        text = "The highlighted entry will be executed automatically in %d seconds"
 }

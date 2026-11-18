@@ -1,0 +1,59 @@
+#!/bin/sh
+# DolphinOS 输出收敛（labwc autostart 第一步、拉起 swaybg/Shell 之前运行）
+#
+# 背景（Alpha 10）：Alpha 9 在 VirtualBox 试跑里桌面只剩蓝底、Shell
+# 不显示。本地双输出实验已复现其机制：labwc 把 Shell 的全屏窗口放到
+# 了第二块输出上，第一块只剩蓝底（见 SHELL-DIAG-REPORT.md 实验 E5）。
+# vmwgfx 会枚举 8 个 CRTC，幻影输出是否被启用在真机上无从预知，
+# 故从会话源头收敛：
+#   1. rc.xml 里 autoEnableOutputs=no，labwc 不自动启用任何输出；
+#   2. 本脚本用 wlr-randr 只启用清单里的第一块输出、其余一律 --off，
+#      Shell 只能落在这一块看得见的屏上；
+#   3. 收敛前的 DRM 输出状态与 wlr-randr 清单都记进
+#      /tmp/dolphin-outputs.log，以后每次试跑自带输出证据。
+# wlr-randr 缺失或清单为空时不做任何动作、只记日志（此时 labwc 也没
+# 有可用输出可关，属构建配置错误，日志里能看出来）。
+
+LOG_FILE=/tmp/dolphin-outputs.log
+
+{
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') dolphin-output-setup ==="
+    for f in /sys/class/drm/card*-*/status; do
+        [ -e "$f" ] && echo "drm $f: $(cat "$f" 2>/dev/null)"
+    done
+} >> "$LOG_FILE" 2>&1
+
+if ! command -v wlr-randr >/dev/null 2>&1; then
+    echo "wlr-randr not found, leaving outputs untouched" >> "$LOG_FILE"
+    exit 0
+fi
+
+# wlr-randr 无参数时逐块打印输出：名字行不缩进，后跟属性行（缩进）。
+# 取名字行第一列即输出名（Virtual-1、HEADLESS-2、HDMI-A-1 等形态）。
+list_outputs() {
+    wlr-randr 2>/dev/null | sed -n 's/^\([A-Za-z0-9][A-Za-z0-9-]*\) .*/\1/p'
+}
+
+outputs=$(list_outputs)
+if [ -z "$outputs" ]; then
+    # 合成器刚起时清单可能还没就绪，重试一次再放弃
+    sleep 1
+    outputs=$(list_outputs)
+fi
+if [ -z "$outputs" ]; then
+    echo "wlr-randr reported no outputs, leaving outputs untouched" >> "$LOG_FILE"
+    exit 0
+fi
+
+first=1
+for out in $outputs; do
+    if [ "$first" -eq 1 ]; then
+        wlr-randr --output "$out" --on >> "$LOG_FILE" 2>&1
+        echo "primary output enabled: $out" >> "$LOG_FILE"
+        first=0
+    else
+        wlr-randr --output "$out" --off >> "$LOG_FILE" 2>&1
+        echo "extra output disabled: $out" >> "$LOG_FILE"
+    fi
+done
+exit 0

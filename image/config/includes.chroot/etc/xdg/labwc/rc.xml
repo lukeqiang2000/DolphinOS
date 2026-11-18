@@ -2,6 +2,15 @@
 <!-- DolphinOS labwc 基础配置（系统级 /etc/xdg/labwc，用户可在 ~/.config/labwc 覆盖）
      Alpha 7：保证登录进桌面后有 Alt+Tab 切换与终端快捷键可用。 -->
 <labwc_config>
+  <core>
+    <!-- Alpha 10 输出加固：不让 labwc 自动启用输出。vmwgfx 等虚拟显卡
+         会枚举多块输出，默认全部启用时全屏窗口可能被放到不可见的
+         幻影输出上（Alpha 9 真机 Shell 不显示的头号嫌疑，机制已在
+         本地双输出实验复现）。关掉后改由 autostart 第一步的
+         dolphin-output-setup 用 wlr-randr 只启用第一块输出、关掉
+         其余，Shell 只能落在看得见的屏上。 -->
+    <autoEnableOutputs>no</autoEnableOutputs>
+  </core>
   <keyboard>
     <keybind key="A-Tab">
       <action name="NextWindow" />

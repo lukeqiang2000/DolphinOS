@@ -22,8 +22,9 @@ else
     echo "警告: /usr/local/bin/dolphin-session 不存在，greetd 会话将无法启动" >&2
 fi
 
-# 登录屏会话包装与 Shell 启动器同样必须在位且可执行（Alpha 9 新增）
-for script in dolphin-greeter-session dolphin-shell-launcher; do
+# 登录屏会话包装与 Shell 启动器同样必须在位且可执行（Alpha 9 新增）；
+# dolphin-output-setup 是 Alpha 10 的 autostart 输出收敛脚本，一并校验
+for script in dolphin-greeter-session dolphin-shell-launcher dolphin-output-setup; do
     if [ -f "/usr/local/bin/$script" ]; then
         chmod +x "/usr/local/bin/$script" || true
     else

@@ -1,4 +1,9 @@
 # DolphinOS labwc autostart（系统级 /etc/xdg/labwc）
+# 0) 输出收敛（Alpha 10）：rc.xml 里 autoEnableOutputs=no，输出必须
+#    在这里显式启用。dolphin-output-setup 只启用第一块输出、关掉其余
+#    幻影输出，防止 Shell 全屏窗口被放到不可见的屏上；前台执行，
+#    收敛完成后再往下走。
+/usr/local/bin/dolphin-output-setup
 # 1) 蓝底兜底：即使 Shell 起不来，桌面也是 Dolphin 蓝而不是黑屏，
 #    一眼能区分「合成器活着、Shell 没起来」和「合成器死了」。
 swaybg -c '#0b5bcb' >/dev/null 2>&1 &

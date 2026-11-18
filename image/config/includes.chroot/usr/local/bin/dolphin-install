@@ -184,28 +184,34 @@ user = "_greetd"
 EOF
 
 # GRUB 默认项：装盘后同样不显示菜单、直接启动；关 os-prober 防报错；
+# 内核命令行带 quiet splash，装盘后开机动画（Plymouth 海豚）才会出现；
 # 主题素材在位时挂上与 Live 相同的海豚主题。
+# 注意：镜像里只有 grub-*-bin 包、没有 grub-pc 的 /etc/default/grub
+# conffile，文件多半不存在——不存在就先创建，否则下面整段会被跳过
+# （Alpha 10 实测踩过：装盘系统无 quiet/splash、开机只有文本滚动）。
 GRUB_DEFAULTS="$TARGET/etc/default/grub"
-if [ -f "$GRUB_DEFAULTS" ]; then
-    sed -i \
-        -e 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' \
-        -e 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' \
-        -e 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' \
-        "$GRUB_DEFAULTS"
-    grep -q '^GRUB_TIMEOUT=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT=0' >> "$GRUB_DEFAULTS"
-    grep -q '^GRUB_TIMEOUT_STYLE=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT_STYLE=hidden' >> "$GRUB_DEFAULTS"
-    grep -q '^GRUB_DISABLE_OS_PROBER=' "$GRUB_DEFAULTS" || echo 'GRUB_DISABLE_OS_PROBER=true' >> "$GRUB_DEFAULTS"
+if [ ! -f "$GRUB_DEFAULTS" ]; then
+    mkdir -p "$TARGET/etc/default"
+    printf '%s\n' '# DolphinOS：由 dolphin-install 创建的 GRUB 默认配置' > "$GRUB_DEFAULTS"
 fi
+sed -i \
+    -e 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' \
+    -e 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' \
+    -e 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' \
+    -e 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' \
+    "$GRUB_DEFAULTS"
+grep -q '^GRUB_TIMEOUT=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT=0' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_TIMEOUT_STYLE=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT_STYLE=hidden' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_DISABLE_OS_PROBER=' "$GRUB_DEFAULTS" || echo 'GRUB_DISABLE_OS_PROBER=true' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULTS" || echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >> "$GRUB_DEFAULTS"
 MEDIUM_GRUB=/lib/live/mount/medium/boot/grub
 if [ -d "$MEDIUM_GRUB/live-theme" ]; then
     mkdir -p "$TARGET/boot/grub"
     cp -r "$MEDIUM_GRUB/live-theme" "$TARGET/boot/grub/" 2>/dev/null || true
     cp "$MEDIUM_GRUB/splash.png" "$TARGET/boot/grub/" 2>/dev/null || true
     cp "$MEDIUM_GRUB/theme.cfg" "$TARGET/boot/grub/" 2>/dev/null || true
-    if [ -f "$GRUB_DEFAULTS" ]; then
-        sed -i 's|^GRUB_THEME=.*|GRUB_THEME=/boot/grub/live-theme/theme.txt|' "$GRUB_DEFAULTS"
-        grep -q '^GRUB_THEME=' "$GRUB_DEFAULTS" || echo 'GRUB_THEME=/boot/grub/live-theme/theme.txt' >> "$GRUB_DEFAULTS"
-    fi
+    sed -i 's|^GRUB_THEME=.*|GRUB_THEME=/boot/grub/live-theme/theme.txt|' "$GRUB_DEFAULTS"
+    grep -q '^GRUB_THEME=' "$GRUB_DEFAULTS" || echo 'GRUB_THEME=/boot/grub/live-theme/theme.txt' >> "$GRUB_DEFAULTS"
 fi
 
 ROOT_UUID=$(blkid -s UUID -o value "$P_ROOT")

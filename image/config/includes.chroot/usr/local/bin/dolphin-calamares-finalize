@@ -60,7 +60,7 @@ rm -rf /etc/calamares 2>/dev/null || true
 log "Live 残留已清理"
 
 # 4. 卸包（purge 不需要网络；失败不拦安装）
-apt-get purge -y live-boot live-config live-tools calamares >/dev/null 2>&1 || \
+apt-get purge -y live-boot live-boot-doc live-boot-initramfs-tools live-config live-config-doc live-config-systemd live-tools calamares >/dev/null 2>&1 || \
     log "警告: 卸 Live 包/Calamares 时 apt 返回非零，已忽略"
 log "收尾完成"
 exit 0

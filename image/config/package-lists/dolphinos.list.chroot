@@ -62,11 +62,13 @@ bazaar
 # 2026-11-19 定案：自研页「开始安装」经 sudo -n 拉引擎失败且静默，
 # 无从排查）。配置与品牌在 includes.chroot/etc/calamares（settings、
 # 模块配置、dolphin 品牌与四款主题样式表），入口脚本
-# dolphin-calamares 经 pkexec 拉起（polkitd 提供 pkexec 与守护进程，
-# policykit-1 为其元包）。squashfs-tools 供 unpackfs 解包 Live 根。
+# dolphin-calamares 经 pkexec 拉起（polkitd 提供守护进程，pkexec 为
+# 独立二进制包；注意 sid 已无 policykit-1 这个包名，写了会让整轮
+# 装包失败——Alpha 11 首建实测踩过）。squashfs-tools 供 unpackfs
+# 解包 Live 根。
 calamares
 polkitd
-policykit-1
+pkexec
 squashfs-tools
 
 # Calamares 的 bootloader 模块在目标 chroot 里装引导时需要的工具链：

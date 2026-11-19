@@ -76,11 +76,22 @@ pub const CARD_DY: f32 = 156.0;
 /// 替身放大到的「窗口」矩形（内容坐标）：覆盖整个网格区。
 pub const ANIM_TARGET: (f32, f32, f32, f32) = (24.0, 40.0, 688.0, 500.0);
 
-/// 第 idx 张卡片在内容坐标里的矩形 (x, y, w, h)。
-pub fn card_rect(idx: usize) -> (f32, f32, f32, f32) {
+/// 网格列数随可用宽度自适应（Alpha 10 修复：旧版 UI 与此处都写死
+/// 4 列，大屏上板块不随屏幕调整）：n 列需要 GRID_X + (n-1)*CARD_DX +
+/// CARD_W = 184 + (n-1)*176 px。结果夹在 [2, 12]。阈值与
+/// app-window.slint 的 grid-cols 属性保持一致；运行时 Rust 侧直接
+/// 读 UI 的 grid-cols 属性传给 card_rect/anim_frame，以 UI 为准。
+pub fn grid_columns(width: f32) -> usize {
+    let n = ((width - (GRID_X + CARD_W)) / CARD_DX).floor() as i64 + 1;
+    n.clamp(2, 12) as usize
+}
+
+/// 第 idx 张卡片在内容坐标里的矩形 (x, y, w, h)（cols = 当前列数）。
+pub fn card_rect(idx: usize, cols: usize) -> (f32, f32, f32, f32) {
+    let cols = cols.max(1);
     (
-        GRID_X + (idx % 4) as f32 * CARD_DX,
-        GRID_Y + (idx / 4) as f32 * CARD_DY,
+        GRID_X + (idx % cols) as f32 * CARD_DX,
+        GRID_Y + (idx / cols) as f32 * CARD_DY,
         CARD_W,
         CARD_H,
     )
@@ -99,10 +110,10 @@ pub fn ease_in_out_cubic(p: f32) -> f32 {
 /// 动画进度 p 时的替身状态：(x, y, w, h, scale_x, opacity)。
 /// 几何按缓动从卡片矩形插值到目标矩形；翻转用原始进度的 |cos(πp)|
 /// （一圈整翻）；不透明度在最后 25% 线性淡出，把画面交给真实窗口。
-pub fn anim_frame(idx: usize, p: f32) -> (f32, f32, f32, f32, f32, f32) {
+pub fn anim_frame(idx: usize, p: f32, cols: usize) -> (f32, f32, f32, f32, f32, f32) {
     let p = p.clamp(0.0, 1.0);
     let e = ease_in_out_cubic(p);
-    let (cx, cy, cw, ch) = card_rect(idx);
+    let (cx, cy, cw, ch) = card_rect(idx, cols);
     let (tx, ty, tw, th) = ANIM_TARGET;
     let lerp = |a: f32, b: f32| a + (b - a) * e;
     let scale_x = (std::f32::consts::PI * p).cos().abs();
@@ -312,22 +323,41 @@ mod tests {
     }
 
     #[test]
+    fn grid_columns_adapts_to_width() {
+        // 阈值：n 列需要 184 + (n-1)*176 px（与 .slint 的 grid-cols 一致）
+        assert_eq!(grid_columns(320.0), 2, "极窄屏保底 2 列");
+        assert_eq!(grid_columns(535.0), 2);
+        assert_eq!(grid_columns(536.0), 3);
+        assert_eq!(grid_columns(711.0), 3);
+        assert_eq!(grid_columns(712.0), 4);
+        assert_eq!(grid_columns(1280.0), 7);
+        assert_eq!(grid_columns(1920.0), 10);
+        assert_eq!(grid_columns(2560.0), 12);
+        assert_eq!(grid_columns(3840.0), 12, "超大屏封顶 12 列");
+        // card_rect 跟随列数：第 5 张卡在 4 列时是第二行第一张，
+        // 在 7 列时仍在第一行
+        assert_eq!(card_rect(5, 4).1, GRID_Y + CARD_DY);
+        assert_eq!(card_rect(5, 7).1, GRID_Y);
+        assert_eq!(card_rect(5, 7).0, GRID_X + 5.0 * CARD_DX);
+    }
+
+    #[test]
     fn anim_frame_endpoints_and_midpoint() {
         // 起点 = 卡片原位原尺寸、scale 1、不透明
-        let (x, y, w, h, s, o) = anim_frame(5, 0.0);
-        let (cx, cy, cw, ch) = card_rect(5);
+        let (x, y, w, h, s, o) = anim_frame(5, 0.0, 4);
+        let (cx, cy, cw, ch) = card_rect(5, 4);
         assert_eq!((x, y, w, h), (cx, cy, cw, ch));
         assert_eq!(s, 1.0);
         assert_eq!(o, 1.0);
         // 中点：翻转到侧面（scale≈0），几何已放大一半（缓动中点 e=0.5）
-        let (x, y, w, h, s, o) = anim_frame(5, 0.5);
+        let (x, y, w, h, s, o) = anim_frame(5, 0.5, 4);
         assert!(s < 0.01, "中点应翻到侧面, scale={s}");
         assert!((w - (cw + ANIM_TARGET.2) / 2.0).abs() < 0.6);
         assert!((h - (ch + ANIM_TARGET.3) / 2.0).abs() < 0.6);
         assert_eq!(o, 1.0);
         let _ = (x, y);
         // 终点 = 目标矩形、scale 回到 1、完全淡出
-        let (x, y, w, h, s, o) = anim_frame(5, 1.0);
+        let (x, y, w, h, s, o) = anim_frame(5, 1.0, 4);
         assert_eq!((x, y, w, h), ANIM_TARGET);
         assert_eq!(s, 1.0);
         assert_eq!(o, 0.0);

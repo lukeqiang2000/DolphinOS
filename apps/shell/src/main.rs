@@ -143,7 +143,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // 动画 QA 钩子：DOLPHIN_SHELL_ANIM_PREVIEW=1 时把放大翻转替身冻结在
     // 中点帧，供截屏核对（正常运行不设此变量，无任何影响）。
     if std::env::var("DOLPHIN_SHELL_ANIM_PREVIEW").is_ok() {
-        let (x, y, w, h, s, o) = logic::anim_frame(1, 0.5);
+        let (x, y, w, h, s, o) = logic::anim_frame(1, 0.5, ui.get_grid_cols().max(1) as usize);
         ui.set_anim_x(x);
         ui.set_anim_y(y);
         ui.set_anim_w(w);
@@ -188,7 +188,10 @@ fn main() -> Result<(), slint::PlatformError> {
                     // 放大+翻转替身（Alpha 10 新规格，取代旧「卡片原地翻面」）：
                     // 替身从卡片矩形缓动放大到窗口矩形、同时绕竖轴整翻一圈，
                     // 翻到中点（正反面交替瞬间）启动应用，后段淡出交棒真实窗口。
-                    let (x, y, w, h, s, o) = logic::anim_frame(state.idx, p as f32);
+                    // 列数以 UI 当前 grid-cols 为准（随窗口宽度自适应），
+                    // 替身起点才能与卡片实际位置重合。
+                    let cols = ui.get_grid_cols().max(1) as usize;
+                    let (x, y, w, h, s, o) = logic::anim_frame(state.idx, p as f32, cols);
                     ui.set_anim_x(x);
                     ui.set_anim_y(y);
                     ui.set_anim_w(w);

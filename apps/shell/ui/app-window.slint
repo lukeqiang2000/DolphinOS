@@ -179,6 +179,24 @@ export component AppWindow inherits Window {
     in property <string> syscard-path: "";
     in property <[DesktopCard]> cards;
     in property <[DesktopCard]> launcher-cards;
+    // 网格列数随窗口宽度自适应（Alpha 10 修复：旧版写死 4 列，大屏上
+    // 右侧大片空白、板块不随屏幕调整）：n 列需要 184 + (n-1)*176 px
+    // （左边距 24 + 卡宽 160 + 列间距 16，步距 176）。阈值与 logic.rs
+    // 的 grid_columns 保持一致；Rust 侧动画几何经 get_grid_cols 取本值，
+    // 两处不会漂移。窗口全屏（main.rs set_fullscreen），root.width 即
+    // 屏幕可用宽度，改窗口/换分辨率即时重排。
+    out property <int> grid-cols: root.width >= 2120px ? 12
+        : root.width >= 1944px ? 11
+        : root.width >= 1768px ? 10
+        : root.width >= 1592px ? 9
+        : root.width >= 1416px ? 8
+        : root.width >= 1240px ? 7
+        : root.width >= 1064px ? 6
+        : root.width >= 888px ? 5
+        : root.width >= 712px ? 4
+        : root.width >= 536px ? 3
+        : 2;
+    out property <int> grid-rows: Math.max(1, (root.cards.length + root.grid-cols - 1) / root.grid-cols);
     in-out property <bool> launcher-open: false;
     in-out property <string> search-text: "";
     in property <int> flipping-index: -1;
@@ -337,7 +355,7 @@ export component AppWindow inherits Window {
         // ── 板块网格桌面 ──
         ScrollView {
             Rectangle {
-                height: (root.cards.length + 3) / 4 * 156px + 190px;
+                height: root.grid-rows * 156px + 190px;
                 background: transparent;
 
                 Text {
@@ -349,8 +367,8 @@ export component AppWindow inherits Window {
                 }
 
                 for card[i] in root.cards: Card {
-                    x: 24px + Math.mod(i, 4) * 176px;
-                    y: 40px + Math.floor(i / 4) * 156px;
+                    x: 24px + Math.mod(i, root.grid-cols) * 176px;
+                    y: 40px + Math.floor(i / root.grid-cols) * 156px;
                     idx: card.idx;
                     name: card.name;
                     section: card.section;
@@ -371,7 +389,7 @@ export component AppWindow inherits Window {
                 // ── 系统板块卡：设置 / 关机 / 重启 ──
                 Rectangle {
                     x: 24px;
-                    y: 56px + (root.cards.length + 3) / 4 * 156px;
+                    y: 56px + root.grid-rows * 156px;
                     width: 688px;
                     height: 120px;
                     background: transparent;
@@ -408,7 +426,7 @@ export component AppWindow inherits Window {
 
                 if root.status-text != "": Text {
                     x: 24px;
-                    y: 186px + (root.cards.length + 3) / 4 * 156px;
+                    y: 186px + root.grid-rows * 156px;
                     text: root.status-text;
                     color: root.c-sub;
                     font-size: 12px;

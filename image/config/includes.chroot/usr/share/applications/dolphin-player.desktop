@@ -1,6 +1,7 @@
 [Desktop Entry]
 Name=视频
-Comment=DolphinOS 视频查看器
-Exec=dolphin-player
+Comment=DolphinOS 视频播放器（兼音乐播放）
+Exec=dolphin-player %F
 Type=Application
 Categories=AudioVideo;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/x-ms-wmv;video/x-flv;video/ogg;audio/mpeg;audio/flac;audio/ogg;audio/x-vorbis+ogg;audio/x-wav;audio/mp4;audio/aac;audio/opus;

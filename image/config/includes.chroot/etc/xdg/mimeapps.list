@@ -1,0 +1,21 @@
+# DolphinOS 系统级默认应用关联：视频与音乐文件默认用自研播放器打开。
+# 文件管理器双击文件走 xdg-open，最终按这份表选应用；各类型的
+# MimeType 声明在 dolphin-player.desktop 里，两处保持一致。
+[Default Applications]
+video/mp4=dolphin-player.desktop
+video/x-matroska=dolphin-player.desktop
+video/webm=dolphin-player.desktop
+video/quicktime=dolphin-player.desktop
+video/x-msvideo=dolphin-player.desktop
+video/mpeg=dolphin-player.desktop
+video/x-ms-wmv=dolphin-player.desktop
+video/x-flv=dolphin-player.desktop
+video/ogg=dolphin-player.desktop
+audio/mpeg=dolphin-player.desktop
+audio/flac=dolphin-player.desktop
+audio/ogg=dolphin-player.desktop
+audio/x-vorbis+ogg=dolphin-player.desktop
+audio/x-wav=dolphin-player.desktop
+audio/mp4=dolphin-player.desktop
+audio/aac=dolphin-player.desktop
+audio/opus=dolphin-player.desktop

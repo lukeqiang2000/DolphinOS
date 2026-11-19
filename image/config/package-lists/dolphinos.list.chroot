@@ -47,10 +47,15 @@ gstreamer1.0-plugins-base
 gstreamer1.0-plugins-good
 
 # 网络与多媒体栈
+# xdg-utils：提供 xdg-open——文件管理器双击文件就靠它按 mimeapps
+# 关联打开（Alpha 10 漏装，双击任何文件都 spawn 失败，见
+# ALPHA10-BUGFIX-REPORT.md 的 Bug 4）；关联表在
+# includes.chroot/etc/xdg/mimeapps.list。
 network-manager
 pipewire
 wireplumber
 xdg-desktop-portal-wlr
+xdg-utils
 
 # 应用商店（Alpha 10 用户改定）：Bazaar（Kolunmi 的 Flatpak 商店，
 # sid 有现成包，依赖自动带入 flatpak）；Flathub 系统源由

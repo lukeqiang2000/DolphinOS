@@ -1,8 +1,16 @@
 // DolphinOS 视频播放器界面：左侧播放列表（当前项带 ▶ 高亮标记），
 // 右侧上方视频占位区（文件名 + 状态），底部控制条（播放/暂停、停止、
 // 上一首、下一首、进度滑杆 + 时间、音量滑杆）。
+// 左上「打开文件」展开内置文件浏览面板（目录导航 + 点选媒体文件
+// 入列播放）：Alpha 10 修复——旧版只能靠命令行参数喂文件，GUI 里
+// 没有任何打开文件的入口。
 
-import { Button, Slider, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Button, Slider, VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+
+export struct BrowserEntry {
+    label: string,
+    is-dir: bool,
+}
 
 export component AppWindow inherits Window {
     in-out property <string> playlist-text: "";
@@ -15,12 +23,19 @@ export component AppWindow inherits Window {
     in-out property <float> volume: 80;
     in-out property <bool> playing: false;
 
+    in property <[BrowserEntry]> browser-entries;
+    in property <string> browser-path: "";
+    in-out property <bool> browser-open: false;
+
     callback play-pause();
     callback stop();
     callback next-track();
     callback prev-track();
     callback seek(float);
     callback volume-changed(float);
+    callback toggle-browser();
+    callback browser-up();
+    callback browser-activate(int);
 
     title: "Dolphin 播放器";
     preferred-width: 960px;
@@ -34,18 +49,81 @@ export component AppWindow inherits Window {
             background: #10151b;
 
             VerticalBox {
-                Text {
-                    text: "播放列表";
-                    color: #8fa3b8;
-                    font-size: 13px;
+                HorizontalBox {
+                    Text {
+                        text: root.browser-open ? "打开文件" : "播放列表";
+                        color: #8fa3b8;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                    }
+
+                    Button {
+                        text: root.browser-open ? "关闭" : "打开文件…";
+                        clicked => {
+                            if (root.browser-open) {
+                                root.browser-open = false;
+                            } else {
+                                root.toggle-browser();
+                            }
+                        }
+                    }
                 }
 
-                Text {
+                if !root.browser-open: Text {
                     text: root.playlist-text;
                     color: #dbe4ee;
                     font-size: 13px;
                     wrap: no-wrap;
                     vertical-stretch: 1;
+                }
+
+                if root.browser-open: VerticalBox {
+                    vertical-stretch: 1;
+
+                    Text {
+                        text: root.browser-path;
+                        color: #8fa3b8;
+                        font-size: 11px;
+                        wrap: no-wrap;
+                    }
+
+                    HorizontalBox {
+                        Button {
+                            text: "上级目录";
+                            clicked => { root.browser-up(); }
+                        }
+
+                        Text {
+                            text: "点目录进入，点文件加入列表并播放";
+                            color: #8fa3b8;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    ScrollView {
+                        vertical-stretch: 1;
+
+                        VerticalBox {
+                            alignment: start;
+
+                            for entry[i] in root.browser-entries: Rectangle {
+                                height: 30px;
+                                background: transparent;
+
+                                Text {
+                                    text: entry.label;
+                                    color: entry.is-dir ? #7cc4ff : #dbe4ee;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                }
+
+                                TouchArea {
+                                    clicked => { root.browser-activate(i); }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

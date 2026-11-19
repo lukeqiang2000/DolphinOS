@@ -4,13 +4,69 @@
 use std::path::{Path, PathBuf};
 
 /// 常见视频扩展名（小写比较）。
-const VIDEO_EXTS: &[&str] = &["mp4", "mkv", "webm", "avi", "mov"];
+const VIDEO_EXTS: &[&str] = &["mp4", "mkv", "webm", "avi", "mov", "wmv", "flv"];
 
-fn is_video(path: &Path) -> bool {
+/// 常见音频扩展名（小写比较）。播放器是系统唯一的媒体播放器，
+/// 音乐文件也归它播（Alpha 10 修复：旧版只认视频扩展名，mp3 等
+/// 音频文件连目录扫描/参数传入都被过滤掉，「音乐打不开」）。
+const AUDIO_EXTS: &[&str] = &["mp3", "flac", "ogg", "oga", "opus", "wav", "m4a", "aac"];
+
+fn has_ext(path: &Path, exts: &[&str]) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| VIDEO_EXTS.contains(&e.to_ascii_lowercase().as_str()))
+        .map(|e| exts.contains(&e.to_ascii_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+fn is_video(path: &Path) -> bool {
+    has_ext(path, VIDEO_EXTS)
+}
+
+/// 可播放的媒体文件（视频或音频）。
+pub fn is_media(path: &Path) -> bool {
+    is_video(path) || has_ext(path, AUDIO_EXTS)
+}
+
+/// 文件浏览器里的一项（目录或媒体文件），供「打开文件」面板列目录。
+#[derive(Debug, Clone, PartialEq)]
+pub struct DirEntry {
+    pub path: PathBuf,
+    pub is_dir: bool,
+}
+
+/// 列一个目录给「打开文件」面板：子目录在前、媒体文件在后，各按
+/// 文件名排序；隐藏项（点开头）与非媒体文件不列。读不了返回空。
+pub fn list_media_dir(dir: &Path) -> Vec<DirEntry> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut files: Vec<PathBuf> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        for entry in rd.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let hidden = path
+                .file_name()
+                .map(|n| n.to_string_lossy().starts_with('.'))
+                .unwrap_or(false);
+            if hidden {
+                continue;
+            }
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.is_file() && is_media(&path) {
+                files.push(path);
+            }
+        }
+    }
+    let by_name = |a: &PathBuf, b: &PathBuf| {
+        a.file_name()
+            .unwrap_or_default()
+            .cmp(b.file_name().unwrap_or_default())
+    };
+    dirs.sort_by(by_name);
+    files.sort_by(by_name);
+    dirs.into_iter()
+        .map(|p| DirEntry { path: p, is_dir: true })
+        .chain(files.into_iter().map(|p| DirEntry { path: p, is_dir: false }))
+        .collect()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -31,11 +87,11 @@ impl Playlist {
         }
     }
 
-    /// 收进一个目录里的视频文件（不递归），按文件名排序。
+    /// 收进一个目录里的媒体文件（视频+音频，不递归），按文件名排序。
     /// 路径本身是文件时按单文件处理。返回新增数量。
     pub fn add_dir(&mut self, dir: &Path) -> usize {
         if dir.is_file() {
-            if is_video(dir) {
+            if is_media(dir) {
                 self.add(dir.to_path_buf());
                 return 1;
             }
@@ -45,7 +101,7 @@ impl Playlist {
             Ok(rd) => rd
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
-                .filter(|p| p.is_file() && is_video(p))
+                .filter(|p| p.is_file() && is_media(p))
                 .collect(),
             Err(_) => return 0,
         };
@@ -357,8 +413,45 @@ mod tests {
         }
         let mut pl = Playlist::new();
         let n = pl.add_dir(&dir);
-        assert_eq!(n, 4);
-        assert_eq!(names(&pl), vec!["a.mkv", "b.mp4", "d.webm", "f.MOV"]);
+        // e.mp3 是音频：播放器兼作音乐播放器后应收进（旧版只认视频时为 4）
+        assert_eq!(n, 5);
+        assert_eq!(names(&pl), vec!["a.mkv", "b.mp4", "d.webm", "e.mp3", "f.MOV"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn list_media_dir_dirs_first_and_filters() {
+        let dir = std::env::temp_dir().join(format!(
+            "dolphin-player-browse-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::create_dir_all(dir.join(".hidden-dir")).unwrap();
+        for name in ["song.mp3", "clip.mp4", "notes.txt", ".hidden.mp3"] {
+            let mut f = std::fs::File::create(dir.join(name)).unwrap();
+            f.write_all(b"x").unwrap();
+        }
+        let entries = list_media_dir(&dir);
+        let labels: Vec<(String, bool)> = entries
+            .iter()
+            .map(|e| {
+                (
+                    e.path.file_name().unwrap().to_string_lossy().into_owned(),
+                    e.is_dir,
+                )
+            })
+            .collect();
+        assert_eq!(
+            labels,
+            vec![
+                ("sub".to_string(), true),
+                ("clip.mp4".to_string(), false),
+                ("song.mp3".to_string(), false),
+            ],
+            "目录在前、媒体文件在后，隐藏项与非媒体文件不列"
+        );
+        assert!(list_media_dir(&dir.join("不存在")).is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

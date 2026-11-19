@@ -1,0 +1,26 @@
+// DolphinOS: allow local desktop users to power off / reboot without
+// interactive authentication.
+//
+// Why: the Shell's power buttons call `loginctl poweroff|reboot`, whose
+// authorization goes through polkit (org.freedesktop.login1.power-off /
+// reboot). The graphical session runs NO polkit authentication agent
+// (labwc autostart starts none), and Alpha 10 did not even ship polkitd,
+// so the authorization could never complete and loginctl failed
+// silently -- the buttons appeared to do nothing. DolphinOS is a
+// single-user desktop system; a physically local session may always
+// power off or reboot, matching mainstream desktop defaults.
+polkit.addRule(function(action, subject) {
+    if (!subject.local) {
+        return null;
+    }
+    switch (action.id) {
+        case "org.freedesktop.login1.power-off":
+        case "org.freedesktop.login1.power-off-multiple-sessions":
+        case "org.freedesktop.login1.power-off-ignore-inhibit":
+        case "org.freedesktop.login1.reboot":
+        case "org.freedesktop.login1.reboot-multiple-sessions":
+        case "org.freedesktop.login1.reboot-ignore-inhibit":
+            return polkit.Result.YES;
+    }
+    return null;
+});

@@ -47,6 +47,32 @@ fn spawn_app(ui: &AppWindow, exec: &str) {
     }
 }
 
+/// 关机 / 重启（Alpha 10 修复：旧版是 `let _ = loginctl … .spawn()`
+/// 发出去就不管——spawn 成功只说明二进制起来了，loginctl 的退出码
+/// 从不检查，授权被拒时用户看到的就是「点了没反应」；镜像侧的授权
+/// 保障见 includes.chroot 的 50-dolphin-power.rules）。这里等命令
+/// 结束并核对退出状态：loginctl 失败退到 systemctl，两者都失败
+/// 把真实错误写进状态行，不再静默。
+fn power_action(ui: &AppWindow, action: &str) {
+    let label = if action == "poweroff" { "关机" } else { "重启" };
+    let mut last_err = String::new();
+    for prog in ["loginctl", "systemctl"] {
+        match Command::new(prog).arg(action).output() {
+            Ok(out) if out.status.success() => return,
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                last_err = if stderr.is_empty() {
+                    format!("{prog} 退出状态 {}", out.status)
+                } else {
+                    stderr
+                };
+            }
+            Err(e) => last_err = format!("{prog} 启动失败：{e}"),
+        }
+    }
+    ui.set_status_text(format!("{label}失败：{last_err}").into());
+}
+
 /// squircle 轮廓的 Slint Path 命令串（点列与网站 clip-path 同一套
 /// 超椭圆算法，左上角原点坐标系）。
 fn squircle_path(w: f32, h: f32) -> String {
@@ -316,12 +342,22 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         });
     }
-    ui.on_power_off(move || {
-        let _ = Command::new("loginctl").arg("poweroff").spawn();
-    });
-    ui.on_reboot(move || {
-        let _ = Command::new("loginctl").arg("reboot").spawn();
-    });
+    {
+        let weak = ui.as_weak();
+        ui.on_power_off(move || {
+            if let Some(ui) = weak.upgrade() {
+                power_action(&ui, "poweroff");
+            }
+        });
+    }
+    {
+        let weak = ui.as_weak();
+        ui.on_reboot(move || {
+            if let Some(ui) = weak.upgrade() {
+                power_action(&ui, "reboot");
+            }
+        });
+    }
 
     ui.run()
 }

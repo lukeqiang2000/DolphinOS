@@ -22,4 +22,14 @@ fi
 flatpak remote-add --system --if-not-exists flathub "$REPO_FILE" || \
     echo "警告: 预置 Flathub 系统源失败，Bazaar 首次启动时需手动添加" >&2
 
+# 预取 Flathub 的 appstream 目录数据进系统仓库（Alpha 10 修复：
+# 「Bazaar 加载缓慢」）：remote-add 只写源配置、不拉任何数据，
+# Bazaar 首启必须先把整份目录（appstream XML + 图标，数十 MB）
+# 下载并部署完才能列出应用，在虚拟机/慢网络上要等很久。构建期
+# 先拉好放进 /var/lib/flatpak/appstream，开机打开商店即可直接
+# 浏览。构建环境无网络或 flatpak 需要系统总线而失败时只警告
+# 不中断：最坏情况退回首启现拉（慢但可用），不让整轮构建陪葬。
+flatpak --system update --appstream flathub || \
+    echo "警告: 预取 Flathub appstream 目录失败，Bazaar 首次启动仍需现拉目录" >&2
+
 echo "0110: Flathub 系统源预置完成"

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=安装 DolphinOS
+Name[en]=Install DolphinOS
+Comment=把 DolphinOS 安装到硬盘
+Comment[en]=Install DolphinOS to disk
+Exec=dolphin-calamares
+Icon=/etc/calamares/branding/dolphin/logo.png
+Terminal=false
+Categories=System;
+Keywords=install;calamares;安装;

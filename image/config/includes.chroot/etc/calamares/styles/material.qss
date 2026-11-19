@@ -1,0 +1,88 @@
+/* DolphinOS 安装程序样式 — Material You（仿 Google Pixel）
+ * 配色取系统 Pixel 主题 palette：底 #0e1512、面板 #16211b、
+ * 卡片 #1e2b23、边框 #33503e、强调 #7dd3a8、主字 #eef7f0、
+ * 次字 #a7c4ae。大圆角、 tonal 色块、胶囊形按钮。 */
+
+QWidget {
+    background-color: #0e1512;
+    color: #eef7f0;
+    font-size: 14px;
+}
+
+QListWidget {
+    background-color: #16211b;
+    border: none;
+    outline: none;
+    padding: 12px 8px;
+}
+QListWidget::item {
+    padding: 10px 14px;
+    border-radius: 14px;
+    color: #a7c4ae;
+}
+QListWidget::item:selected { background-color: #7dd3a8; color: #0e1512; }
+QListWidget::item:hover:!selected { background-color: #1e2b23; color: #eef7f0; }
+
+QPushButton {
+    background-color: #1e2b23;
+    border: 1px solid #33503e;
+    border-radius: 14px;
+    padding: 7px 20px;
+    color: #eef7f0;
+}
+QPushButton:hover { background-color: #27382d; border-color: #7dd3a8; }
+QPushButton:pressed { background-color: #7dd3a8; color: #0e1512; }
+QPushButton:disabled { color: #5f7a67; border-color: #1e2b23; }
+QPushButton:default { background-color: #7dd3a8; border-color: #7dd3a8; color: #0e1512; }
+
+QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {
+    background-color: #1e2b23;
+    border: 1px solid #33503e;
+    border-radius: 12px;
+    padding: 6px 12px;
+    color: #eef7f0;
+    selection-background-color: #7dd3a8;
+    selection-color: #0e1512;
+}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #7dd3a8; }
+QComboBox::drop-down { border: none; width: 22px; }
+
+QProgressBar {
+    background-color: #1e2b23;
+    border: none;
+    border-radius: 7px;
+    text-align: center;
+    color: #eef7f0;
+    height: 14px;
+}
+QProgressBar::chunk { background-color: #7dd3a8; border-radius: 7px; }
+
+QCheckBox, QRadioButton { spacing: 8px; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 18px; height: 18px;
+    border: 1px solid #33503e;
+    background-color: #1e2b23;
+}
+QCheckBox::indicator { border-radius: 6px; }
+QRadioButton::indicator { border-radius: 9px; }
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background-color: #7dd3a8;
+    border-color: #7dd3a8;
+}
+
+QGroupBox {
+    border: 1px solid #33503e;
+    border-radius: 16px;
+    margin-top: 12px;
+    padding-top: 10px;
+}
+QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; color: #a7c4ae; }
+
+QScrollBar:vertical { background: #0e1512; width: 10px; border: none; }
+QScrollBar::handle:vertical { background: #33503e; border-radius: 5px; min-height: 30px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { background: #0e1512; height: 10px; border: none; }
+QScrollBar::handle:horizontal { background: #33503e; border-radius: 5px; min-width: 30px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+
+QToolTip { background-color: #1e2b23; color: #eef7f0; border: 1px solid #33503e; }

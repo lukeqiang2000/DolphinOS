@@ -44,7 +44,7 @@
 - 硬件适配打包：镜像含 firmware-linux、firmware-linux-nonfree（non-free-firmware 分区）、amd64-microcode、intel-microcode，GPU/无线固件与 CPU 微码开箱齐全；NVIDIA 默认 nouveau，不预装闭源驱动。
 - 首次设置向导（完整版）：语言、网络、账号、指纹/人脸录入、选主题、隐私选项、数据导入。
 - 语言：安装时让用户自己选（安装流程含语言选择步）。
-- 安装完整版（Alpha 10 定案 UX）：Live 模式自动登录进桌面并自动弹首次设置向导；向导最后一页有「安装完整版」按钮（另留「暂不安装」）；当时不装的，桌面有一张「安装完整版」卡片可再进入安装（该入口只在 Live 会话显示，装到硬盘后的系统不显示）。安装引擎做最小闭环：选盘（整盘清空警示）、UEFI=ESP+根/BIOS=根+GRUB 装 MBR、复制 Live 根文件系统、grub-install、按 UUID 写 fstab、用向导账号建正式用户并关 Live 自动登录。
+- 安装完整版（Alpha 10 定案 UX；Alpha 11 起安装器换 Calamares，用户定案）：Live 模式自动登录进桌面并自动弹首次设置向导；向导最后一页有「安装完整版」按钮（另留「暂不安装」），点击拉起 Calamares；当时不装的，桌面有一张「安装完整版」卡片可再进入安装（该入口只在 Live 会话显示，装到硬盘后的系统不显示）。安装走 Calamares（DolphinOS 自备 /etc/calamares 配置与品牌）：欢迎/语言/键盘/分区（整盘擦除＋手动）/用户/执行（unpackfs 解包 Live 根、建用户、删 Live 用户、装 GRUB、收尾去 Live 自动登录并卸 Live 包与安装器本体），BIOS 与 UEFI 均走 GRUB（UEFI 带 fallback 写入）。安装器界面有与系统四主题（Dolphin/Metro/Fluent/Pixel）对应的四款样式，启动器按当前所选主题自动匹配。Alpha 10 的自研安装页与 dolphin-install 引擎已退役（其 sudo -n 拉起失败且静默无报错，是本次替换的直接原因）。
 
 ## 6. 预装应用
 

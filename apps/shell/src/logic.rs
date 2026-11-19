@@ -27,8 +27,9 @@ pub fn default_apps() -> Vec<AppEntry> {
         AppEntry { id: "store", name: "应用商店", exec: "bazaar", section: "系统", frequent: false },
         AppEntry { id: "oobe", name: "首次设置", exec: "dolphin-oobe", section: "系统", frequent: false },
         // 安装完整版：只在 Live 会话出现（visible_apps 按会话过滤），
-        // 点击直接进向导的安装页；装盘后的系统里没有这张卡。
-        AppEntry { id: "install", name: "安装完整版", exec: "dolphin-oobe --install", section: "系统", frequent: false },
+        // 点击直接拉起 Calamares 安装程序（Alpha 11 起，启动器负责按
+        // 当前主题选样式表与 pkexec 提权）；装盘后的系统里没有这张卡。
+        AppEntry { id: "install", name: "安装完整版", exec: "dolphin-calamares", section: "系统", frequent: false },
     ]
 }
 
@@ -56,7 +57,7 @@ pub fn visible_apps(apps: &[AppEntry], live: bool) -> Vec<AppEntry> {
 }
 
 /// 把 exec 串拆成 (程序, 参数)：exec 允许带空格分隔的参数
-/// （如 "dolphin-oobe --install"），启动时程序名走 resolve_exec、
+/// （如 "dolphin-oobe --autostart"），启动时程序名走 resolve_exec、
 /// 参数原样传给子进程。
 pub fn parse_exec(exec: &str) -> (String, Vec<String>) {
     let mut parts = exec.split_whitespace();
@@ -302,9 +303,9 @@ mod tests {
 
     #[test]
     fn parse_exec_splits_args() {
-        let (prog, args) = parse_exec("dolphin-oobe --install");
+        let (prog, args) = parse_exec("dolphin-oobe --autostart");
         assert_eq!(prog, "dolphin-oobe");
-        assert_eq!(args, vec!["--install".to_string()]);
+        assert_eq!(args, vec!["--autostart".to_string()]);
         let (prog, args) = parse_exec("bazaar");
         assert_eq!(prog, "bazaar");
         assert!(args.is_empty());

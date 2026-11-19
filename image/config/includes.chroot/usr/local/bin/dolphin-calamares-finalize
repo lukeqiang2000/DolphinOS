@@ -1,0 +1,66 @@
+#!/bin/sh
+# DolphinOS 装盘收尾（Calamares 的 shellprocess@finalize 在目标系统
+# chroot 内调用）：接替旧自研引擎 dolphin-install 的目标侧清理职责。
+#
+# 做四件事：
+#   1. greetd 配置换成装盘版：去掉 Live 的 [initial_session] 自动登录，
+#      只留密码登录（内容与旧引擎写入的那份逐字一致）；
+#   2. 写 /etc/default/grub：菜单隐藏、quiet splash（装盘后开机动画
+#      才会出现）、关 os-prober——必须赶在 bootloader 模块跑
+#      grub-mkconfig 之前（序列里 finalize 在 bootloader 前面）；
+#   3. 清 Live 残留：/etc/live、/lib/live、Live 用户的主目录残留
+#      （账号本体由 removeuser 模块删，这里只清目录）；
+#   4. 卸 Live 专用包与 Calamares 本体（装好的系统里不留安装程序；
+#      initramfs 由随后的 initramfs 模块统一重建）。
+#
+# 口径：逐项兜底、恒 exit 0。单项失败只记日志，不拖垮整次安装
+# （与旧引擎各步 || true 的做法一致）；真失败会在 QEMU 验收里现形。
+set -u
+log() { echo "[dolphin-finalize] $*"; }
+
+# 1. greetd 装盘版配置
+cat > /etc/greetd/config.toml <<'EOF'
+# greetd 配置（装盘系统，由 dolphin-calamares-finalize 写入）：只有密码登录，
+# 没有 Live 的自动登录节。会话命令与 Live 版保持一致。
+[terminal]
+vt = 1
+
+[default_session]
+command = "/usr/local/bin/dolphin-greeter-session"
+user = "_greetd"
+EOF
+log "greetd 配置已换成装盘版（无自动登录）"
+
+# 2. GRUB 默认项（文件不存在就先创建：镜像里只有 grub-*-bin 包、
+# 没有 grub-pc 的 conffile，旧引擎在此踩过坑）
+GRUB_DEFAULTS=/etc/default/grub
+if [ ! -f "$GRUB_DEFAULTS" ]; then
+    mkdir -p /etc/default
+    printf '%s\n' '# DolphinOS：由 dolphin-calamares-finalize 创建的 GRUB 默认配置' > "$GRUB_DEFAULTS"
+fi
+sed -i \
+    -e 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=0/' \
+    -e 's/^GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=hidden/' \
+    -e 's/^GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=true/' \
+    -e 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/' \
+    "$GRUB_DEFAULTS"
+grep -q '^GRUB_TIMEOUT=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT=0' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_TIMEOUT_STYLE=' "$GRUB_DEFAULTS" || echo 'GRUB_TIMEOUT_STYLE=hidden' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_DISABLE_OS_PROBER=' "$GRUB_DEFAULTS" || echo 'GRUB_DISABLE_OS_PROBER=true' >> "$GRUB_DEFAULTS"
+grep -q '^GRUB_CMDLINE_LINUX_DEFAULT=' "$GRUB_DEFAULTS" || echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >> "$GRUB_DEFAULTS"
+log "GRUB 默认项已写入（timeout 0/hidden、quiet splash）"
+
+# 3. Live 残留
+rm -rf /etc/live /lib/live 2>/dev/null || true
+if ! getent passwd user >/dev/null 2>&1; then
+    rm -rf /home/user 2>/dev/null || true
+fi
+# Calamares 自己的配置文件留在装盘系统里没有意义，一并清掉
+rm -rf /etc/calamares 2>/dev/null || true
+log "Live 残留已清理"
+
+# 4. 卸包（purge 不需要网络；失败不拦安装）
+apt-get purge -y live-boot live-config live-tools calamares >/dev/null 2>&1 || \
+    log "警告: 卸 Live 包/Calamares 时 apt 返回非零，已忽略"
+log "收尾完成"
+exit 0

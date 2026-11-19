@@ -1,0 +1,34 @@
+#!/bin/sh
+# DolphinOS 安装程序 root 包装：由 pkexec 以 root 拉起（polkit 动作
+# org.dolphinos.calamares 的 exec.path 就指向本脚本）。pkexec 会清掉
+# 会话环境，这里按启动器传进来的参数把显示环境补齐，再启动 Calamares
+# 并挂上对应主题的样式表。
+#
+# 入参（全部由 dolphin-calamares 传入，逐个白名单校验）：
+#   $1 主题样式名 dolphin|metro|fluent|material
+#   $2 Wayland 显示名（如 wayland-0）
+#   $3 会话运行目录 XDG_RUNTIME_DIR（可空，空则按 Live 用户推断）
+#   $4 X 显示名（可空，XWayland 兜底用）
+THEME="${1:-dolphin}"
+WDISPLAY="${2:-wayland-0}"
+RUNTIME="${3:-}"
+XDISPLAY="${4:-}"
+
+case "$THEME" in
+    dolphin|metro|fluent|material) ;;
+    *) THEME=dolphin ;;
+esac
+STYLE="/etc/calamares/styles/$THEME.qss"
+[ -f "$STYLE" ] || STYLE="/etc/calamares/styles/dolphin.qss"
+
+if [ -z "$RUNTIME" ]; then
+    LIVE_UID=$(id -u user 2>/dev/null || echo 1000)
+    RUNTIME="/run/user/$LIVE_UID"
+fi
+export XDG_RUNTIME_DIR="$RUNTIME"
+export WAYLAND_DISPLAY="$WDISPLAY"
+[ -n "$XDISPLAY" ] && export DISPLAY="$XDISPLAY"
+# 先 Wayland 原生，连不上再退 XWayland（镜像里 xwayland 已装）。
+export QT_QPA_PLATFORM="wayland;xcb"
+
+exec /usr/bin/calamares -stylesheet "$STYLE"

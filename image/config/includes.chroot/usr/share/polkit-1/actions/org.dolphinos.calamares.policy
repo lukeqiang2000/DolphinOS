@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DolphinOS 安装程序的 polkit 动作：pkexec 拉起 root 包装脚本
+     dolphin-calamares-root 时用本动作。Live 会话的用户没有密码，
+     装机是 Live 的主用途之一，故三态全放行（免密）——包装脚本只做
+     一件事：补显示环境后以固定样式表启动 /usr/bin/calamares，
+     入参逐个白名单校验。装盘后的系统里 Calamares 本体已被卸掉，
+     本动作与包装脚本留着也无从触发安装。 -->
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>DolphinOS</vendor>
+  <action id="org.dolphinos.calamares">
+    <description>Run the DolphinOS installer</description>
+    <message>Authentication is required to run the DolphinOS installer</message>
+    <icon_name>drive-harddisk</icon_name>
+    <defaults>
+      <allow_any>yes</allow_any>
+      <allow_inactive>yes</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/bin/dolphin-calamares-root</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

@@ -23,9 +23,10 @@ else
 fi
 
 # 登录屏会话包装与 Shell 启动器同样必须在位且可执行（Alpha 9 新增）；
-# dolphin-output-setup 是 Alpha 10 的 autostart 输出收敛脚本，
-# dolphin-install 是 Alpha 10 的装盘引擎，一并校验
-for script in dolphin-greeter-session dolphin-shell-launcher dolphin-output-setup dolphin-install; do
+# dolphin-output-setup 是 Alpha 10 的 autostart 输出收敛脚本；
+# dolphin-calamares* 是 Alpha 11 的 Calamares 安装入口三件
+# （启动器/root 包装/装盘收尾），一并校验
+for script in dolphin-greeter-session dolphin-shell-launcher dolphin-output-setup dolphin-calamares dolphin-calamares-root dolphin-calamares-finalize; do
     if [ -f "/usr/local/bin/$script" ]; then
         chmod +x "/usr/local/bin/$script" || true
     else

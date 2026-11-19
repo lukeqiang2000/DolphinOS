@@ -7,8 +7,7 @@ mod wizard;
 
 use dolphin_config::{palette, Theme};
 use std::cell::RefCell;
-use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::rc::Rc;
 use wizard::{BiometricChoice, WizardState};
 
@@ -22,40 +21,10 @@ fn is_live_session() -> bool {
     }
 }
 
-/// 枚举可安装的整盘设备（跳过 loop/ram/光盘/映射设备）。
-fn enumerate_disks() -> Vec<InstallDisk> {
-    let mut out = Vec::new();
-    let Ok(rd) = std::fs::read_dir("/sys/block") else {
-        return out;
-    };
-    let mut names: Vec<String> = rd
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| {
-            !(n.starts_with("loop") || n.starts_with("ram") || n.starts_with("sr") || n.starts_with("dm-"))
-        })
-        .collect();
-    names.sort();
-    for name in names {
-        let sectors: u64 = std::fs::read_to_string(format!("/sys/block/{name}/size"))
-            .ok()
-            .and_then(|s| s.trim().parse().ok())
-            .unwrap_or(0);
-        let gib = sectors as f64 * 512.0 / 1_073_741_824.0;
-        let model = std::fs::read_to_string(format!("/sys/block/{name}/device/model"))
-            .map(|s| s.trim().to_string())
-            .unwrap_or_default();
-        let label = if model.is_empty() {
-            format!("/dev/{name} · {gib:.0} GB")
-        } else {
-            format!("/dev/{name} · {gib:.0} GB · {model}")
-        };
-        out.push(InstallDisk {
-            value: format!("/dev/{name}").into(),
-            label: label.into(),
-        });
-    }
-    out
+/// 拉起外部安装程序（Alpha 11：Calamares，经 dolphin-calamares 启动器，
+/// 它负责按当前主题选样式表并经 pkexec 提权）。向导自身不再做安装。
+fn spawn_installer() -> std::io::Result<()> {
+    Command::new("dolphin-calamares").spawn().map(|_| ())
 }
 
 fn hex_to_color(hex: &str) -> slint::Color {
@@ -119,17 +88,18 @@ fn main() -> Result<(), slint::PlatformError> {
     if args.iter().any(|a| a == "--autostart") && dolphin_config::load_settings().oobe_done {
         return Ok(());
     }
-    let install_mode = args.iter().any(|a| a == "--install");
+    // --install（Alpha 10 的桌面卡片直达安装页入口）：Alpha 11 起向导
+    // 不再自带安装页，收到该参数直接转拉外部安装程序后退出（桌面卡片
+    // 本身已改指 dolphin-calamares，这里只做旧入口兼容）。
+    if args.iter().any(|a| a == "--install") {
+        let _ = spawn_installer();
+        return Ok(());
+    }
 
     let ui = AppWindow::new()?;
     let state = Rc::new(RefCell::new(WizardState::new()));
     refresh(&ui, &state.borrow());
     ui.set_is_live(is_live_session());
-    ui.set_install_disks(slint::ModelRc::new(slint::VecModel::from(enumerate_disks())));
-    if install_mode {
-        ui.set_show_install(true);
-        ui.set_install_user("user".into());
-    }
 
     // 下一步
     {
@@ -222,109 +192,20 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     }
 
-    // 进安装页：预填用户名（向导账号步填过的优先，其次当前登录名兜底 user）
+    // 安装完整版（完成页按钮）：拉起外部安装程序 Calamares。
+    // 启动失败（启动器不在位等）时在提示区明示，不再像旧安装页那样
+    // 静默无反应（Alpha 10 的教训）。
     {
-        let state = state.clone();
         let ui_handle = ui.as_weak();
-        ui.on_open_install(move || {
+        ui.on_launch_installer(move || {
             if let Some(ui) = ui_handle.upgrade() {
-                let mut st = state.borrow_mut();
-                sync_from_ui(&ui, &mut st);
-                let name = st.draft.account_name.trim().to_string();
-                ui.set_install_user(if name.is_empty() { "user".into() } else { name.into() });
-                ui.set_show_install(true);
+                match spawn_installer() {
+                    Ok(()) => ui.set_hint_text("".into()),
+                    Err(e) => ui.set_hint_text(format!("启动安装程序失败：{e}").into()),
+                }
             }
         });
     }
-
-    // 离开安装页回向导
-    {
-        let ui_handle = ui.as_weak();
-        ui.on_close_install(move || {
-            if let Some(ui) = ui_handle.upgrade() {
-                ui.set_show_install(false);
-            }
-        });
-    }
-
-    // 开始安装：把参数写进运行时目录的配置文件（sudo 会过滤环境变量，
-    // 引擎支持配置文件入参），再以 sudo -n 拉起引擎、逐行回读进度。
-    {
-        let ui_handle = ui.as_weak();
-        ui.on_start_install(move || {
-            let Some(ui) = ui_handle.upgrade() else { return };
-            let disk = ui.get_install_disk().to_string();
-            let user = ui.get_install_user().to_string();
-            let password = ui.get_install_password().to_string();
-            if disk.is_empty() || user.is_empty() || password.chars().count() < 4 {
-                return;
-            }
-            let runtime = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".into());
-            let conf_path = format!("{runtime}/dolphin-install.conf");
-            let conf = format!(
-                "DOLPHIN_INSTALL_DISK={disk}\nDOLPHIN_INSTALL_USER={user}\nDOLPHIN_INSTALL_PASSWORD={password}\nDOLPHIN_INSTALL_YES=1\n"
-            );
-            if std::fs::write(&conf_path, conf).is_err() {
-                ui.set_install_log("写入安装配置失败".into());
-                ui.set_install_failed(true);
-                return;
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&conf_path, std::fs::Permissions::from_mode(0o600));
-            }
-            ui.set_install_running(true);
-            ui.set_install_failed(false);
-            ui.set_install_done(false);
-            ui.set_install_log("正在启动安装引擎…".into());
-
-            let weak = ui.as_weak();
-            std::thread::spawn(move || {
-                let child = Command::new("sudo")
-                    .args(["-n", "/usr/local/bin/dolphin-install", &conf_path])
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .spawn();
-                let mut log = String::new();
-                let status = match child {
-                    Ok(mut child) => {
-                        if let Some(out) = child.stdout.take() {
-                            for line in BufReader::new(out).lines() {
-                                let Ok(line) = line else { break };
-                                log.push_str(&line);
-                                log.push('\n');
-                                let snapshot = log.clone();
-                                let _ = weak.upgrade_in_event_loop(move |ui| {
-                                    ui.set_install_log(snapshot.into());
-                                });
-                            }
-                        }
-                        child.wait().ok()
-                    }
-                    Err(e) => {
-                        log.push_str(&format!("启动安装引擎失败：{e}\n"));
-                        None
-                    }
-                };
-                let ok = status.map(|s| s.success()).unwrap_or(false);
-                let final_log = log;
-                let _ = weak.upgrade_in_event_loop(move |ui| {
-                    ui.set_install_log(final_log.into());
-                    ui.set_install_running(false);
-                    ui.set_install_done(ok);
-                    ui.set_install_failed(!ok);
-                });
-                // 配置含密码：装完（无论成败）立即删
-                let _ = std::fs::remove_file(&conf_path);
-            });
-        });
-    }
-
-    // 安装完成后的重启
-    ui.on_reboot_now(move || {
-        let _ = Command::new("sudo").args(["-n", "systemctl", "reboot"]).spawn();
-    });
 
     // 关闭窗口（暂不安装 / 装盘系统的完成页关闭）
     {

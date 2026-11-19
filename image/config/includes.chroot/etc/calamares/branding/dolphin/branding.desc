@@ -1,0 +1,43 @@
+# DolphinOS 安装程序品牌（Calamares branding）。
+# 素材（logo/welcome/slide*.png）全部由用户提供的官方海豚矢量图栅格化
+# 而来：只去掉独立的白色背景层、等比缩放，海豚形状零改动。
+# stylesheet.qss 是默认（Dolphin）主题样式；其余三款主题的样式表在
+# /etc/calamares/styles/，由 dolphin-calamares 启动器按当前系统主题选。
+---
+componentName: dolphin
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 1000px,640px
+windowPlacement: center
+
+strings:
+    productName: "DolphinOS"
+    shortProductName: "DolphinOS"
+    version: "9.0 Alpha 11"
+    shortVersion: "Alpha 11"
+    versionedName: "DolphinOS 9.0 Alpha 11"
+    shortVersionedName: "DolphinOS Alpha 11"
+    bootloaderEntryName: "DolphinOS"
+
+sidebar: widget
+navigation: widget
+
+images:
+    productLogo: "logo.png"
+    productIcon: "logo.png"
+    productWelcome: "welcome.png"
+
+slideshow:
+    - "slide1.png"
+    - "slide2.png"
+    - "slide3.png"
+slideshowAPI: 1
+
+style:
+    SidebarBackground: "#131f38"
+    SidebarText: "#94a3b8"
+    SidebarTextCurrent: "#f8fafc"
+    SidebarBackgroundCurrent: "#6366f1"

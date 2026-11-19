@@ -36,7 +36,7 @@ fn parse_hex(s: &str) -> Color {
 }
 
 /// 真正拉起一个应用进程（找不到/起不来只回状态文本，不让 Shell 崩）。
-/// exec 可带参数（如 "dolphin-oobe --install"）：程序名走同目录优先解析，
+/// exec 可带参数（如 "dolphin-oobe --autostart"）：程序名走同目录优先解析，
 /// 参数原样传给子进程。
 fn spawn_app(ui: &AppWindow, exec: &str) {
     let (prog, args) = logic::parse_exec(exec);

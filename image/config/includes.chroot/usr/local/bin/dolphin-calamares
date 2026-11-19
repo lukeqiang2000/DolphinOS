@@ -1,0 +1,26 @@
+#!/bin/sh
+# DolphinOS 安装程序启动器（用户态）：按当前系统主题给 Calamares 选
+# 样式表，再经 pkexec 拉起 root 包装（dolphin-calamares-root，自有
+# polkit 动作 org.dolphinos.calamares 免密放行，Live 会话无密码可过）。
+#
+# 主题真源：~/.config/dolphinos/settings.toml 的 theme 字段
+# （Dolphin|Metro|Fluent|Pixel，见 apps/dolphin-config）。读不到或
+# 不认识的值一律回退 Dolphin 默认样式——装机是正事，主题错配只是
+# 不好看，不能因此起不来安装程序。
+THEME=dolphin
+CFG_DIR="${DOLPHINOS_CONFIG_DIR:-$HOME/.config/dolphinos}"
+CFG="$CFG_DIR/settings.toml"
+if [ -f "$CFG" ]; then
+    T=$(sed -n 's/^[[:space:]]*theme[[:space:]]*=[[:space:]]*"\([A-Za-z]*\)".*/\1/p' "$CFG" | head -n 1)
+    case "$T" in
+        Metro)  THEME=metro ;;
+        Fluent) THEME=fluent ;;
+        Pixel)  THEME=material ;;
+        *)      THEME=dolphin ;;
+    esac
+fi
+
+# 显示环境三件套原样传给 root 包装（root 侧连不上会话合成器就没界面）：
+# 主题名、Wayland 显示名、会话运行目录、X 显示名（XWayland 兜底用）。
+exec pkexec /usr/local/bin/dolphin-calamares-root \
+    "$THEME" "${WAYLAND_DISPLAY:-wayland-0}" "${XDG_RUNTIME_DIR:-}" "${DISPLAY:-}"

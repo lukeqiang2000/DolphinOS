@@ -1,0 +1,9 @@
+// DolphinOS：Live 会话直接以 pkexec 启动 Calamares 本体时的兜底放行
+// （正常路径走 dolphin-calamares 启动器 + org.dolphinos.calamares 动作，
+// 不经本规则）。Live 用户 user 无密码，auth_admin 会把安装程序挡死，
+// 故对该用户免密放行 Calamares 自带的 polkit 动作。
+polkit.addRule(function(action, subject) {
+    if (action.id == "io.calamares.calamares.pkexec.run" && subject.user == "user") {
+        return polkit.Result.YES;
+    }
+});
